@@ -13,7 +13,7 @@ First, install dependencies
 ```bash
 # clone project   
 git clone https://github.com/peleglab/FireflyClassification
-
+```
 # install project   
 ```
 cd FireFlyML   
