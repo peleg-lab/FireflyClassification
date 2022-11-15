@@ -16,7 +16,7 @@ git clone https://github.com/peleglab/FireflyClassification
 ```
 # install project   
 ```
-cd FireFlyML   
+cd FireflyClassification   
 pip install -r requirements.txt
  ```   
 
