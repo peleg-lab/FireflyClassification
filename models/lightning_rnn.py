@@ -255,20 +255,12 @@ class LITGRU(pl.LightningModule):
         subparser.add_argument('--load', action='store_true', help='Enable loading from saved dataloaders')
 
         # training specific (for this model)
-        subparser.add_argument('--n_classes', default=3, type=int,
+        subparser.add_argument('--n_classes', default=4, type=int,
                                help='Number of classes in the training data')
-        subparser.add_argument('--seq_length', default=400, type=int,
-                               help='Max seq length (outdated)')
-        subparser.add_argument('--n_samples', default=500, type=int,
-                               help='Number of samples to generated (outdated)')
-        subparser.add_argument('--generate', type=bool, default=True,
-                               help='Whether to generate augmented sequences')
         subparser.add_argument('--gen_seed', default=42, type=int,
                                help='Seed for the test train split')
         subparser.add_argument('--val_split', default=0.10, type=float,
                                help='Test data ratio (0.10 = 10% of data is in the test set')
-        subparser.add_argument('--augment_train', type=int, default=0,
-                               help='Whether to initiate the generation process for augmentation')
         subparser.add_argument('--downsample', type=int, default=0,
                                help='Whether to downsample to the smallest class dataset size')
         subparser.add_argument('--model', type=str, default='gru',
@@ -284,7 +276,6 @@ class LITGRU(pl.LightningModule):
         return items
 
     def probs_at_thresholds(self, test_dataloader):
-        print(self.hparams['version'])
         y_pred = []
         y_true = []
         with torch.no_grad():  # Deactivate gradients for the following code
@@ -312,7 +303,6 @@ class LITGRU(pl.LightningModule):
         return y_pred, y_true
 
     def eval_real_data(self, test_dataloader, n_classes, save=True, return_cm=False, top_2=False, plot_clusters=False):
-        print(self.hparams['version'])
         y_pred = []
         y_true = []
         topx = 2
@@ -416,14 +406,14 @@ class LITGRU(pl.LightningModule):
                 plt.savefig('figs/cm_{}classes_{}acc.png'.format(n_classes_model,
                                                                  f1_score(y_true, y_pred, average='weighted')))
         else:
-            print('Returning cm for sweep analysis')
             return cm
         print('done')
 
-    def pca_cluster(self, hidden, y, ax):
+    @staticmethod
+    def pca_cluster(hidden, y, ax):
         pca = PCA(n_components=3)
         pca_results = pca.fit_transform(hidden[1])
-        d = {}
+        d = dict()
         d['pca-one'] = pca_results[:, 0]
         d['pca-two'] = pca_results[:, 1]
         d['pca-three'] = pca_results[:, 2]

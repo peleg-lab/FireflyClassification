@@ -86,11 +86,8 @@ class Metrics:
             y_preds.append(np.array(y_pred))
         for c_label in [3, 2, 0, 1]:
             print('Precision for class {}: {}'.format(c_label, np.mean(class_precisions[c_label])))
-            print('Precision std for class {}: {}'.format(c_label, np.std(class_precisions[c_label])))
             print('Recall for class {}: {}'.format(c_label, np.mean(class_recalls[c_label])))
-            print('Recall std for class {}: {}'.format(c_label, np.std(class_recalls[c_label])))
             print('f1 for class {}: {}'.format(c_label, np.mean(class_f1s[c_label])))
-            print('f1 std for class {}: {}'.format(c_label, np.std(class_f1s[c_label])))
         if plot:
             self.plot_roc_curve(n_classes_model, y_tests, y_preds)
             self.plot_pre_rec_curve(n_classes_model, y_tests, y_preds)
@@ -148,7 +145,7 @@ class Metrics:
         plt.legend()
 
         plt.tight_layout()
-        plt.savefig(self.fig_path + '/roc_curves_one_fig_larger_set.png')
+        plt.savefig(self.fig_path + '/roc_curves.png')
 
     def report_auroc(self, y_trues, y_preds):
         for (idx, c_label) in enumerate([3,2,0,1]):
@@ -181,7 +178,7 @@ class Metrics:
             c_ax[idx].set_ylabel("Precision")
             c_ax[idx].set_title("{}".format(names.name_dict[n_classes_model][c_label]))
         plt.tight_layout()
-        plt.savefig(self.fig_path + '/pre_rec_curves_larger_set.png')
+        plt.savefig(self.fig_path + '/pre_rec_curves.png')
 
     def report_auprc(self, y_trues, y_preds):
         for (idx, c_label) in enumerate([3,2,0,1]):
@@ -226,7 +223,6 @@ class Metrics:
             precs.append(precision)
             recs.append(recall)
         print("Precision: {}, Recall: {}, Accuracy: {}".format(np.mean(precs), np.mean(recs), np.mean(accs)))
-        print("Precision std: {}, Recall std: {}, Accuracy std: {}".format(np.std(precs), np.std(recs), np.std(accs)))
 
         fig, ax = plt.subplots()
         sns.heatmap(cm, linewidths=1, ax=ax, annot=True, fmt=".2g", cmap='viridis')
@@ -235,10 +231,10 @@ class Metrics:
         ax.set_xticklabels(names.name_dict[n_classes_model], rotation=90)
         ax.set_yticklabels(names.name_dict[n_classes_model], rotation=0)
         if not top_2:
-            plt.savefig(self.fig_path + '/cm_{}classes_{}acc_{}pre_{}rec_sweep_over_{}_larger_set.png'.format(
+            plt.savefig(self.fig_path + '/cm_{}classes_{}acc_{}pre_{}rec.png'.format(
                 n_classes_model, acc, precision, recall, num_runs)
             )
         else:
-            plt.savefig(self.fig_path + '/cm_{}classes_{}acc_{}pre_{}rec_sweep_over_{}_top_2.png'.format(
+            plt.savefig(self.fig_path + '/cm_{}classes_{}acc_{}pre_{}rec_top_2.png'.format(
                 n_classes_model, acc, precision, recall, num_runs)
             )

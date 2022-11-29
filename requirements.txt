@@ -8,4 +8,5 @@ sklearn
 argparse
 scipy
 pandas
-
+scikit-learn
+seaborn

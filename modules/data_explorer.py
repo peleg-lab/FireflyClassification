@@ -256,6 +256,10 @@ class DataExplorer:
         axes[1].set_xlabel('ifi')
         axes[2].set_xlabel('flash_length')
         axes[0].set_ylabel('pdf')
+        axes[0][0].set_yscale('log')
+        axes[0][1].set_yscale('log')
+        axes[0][2].set_yscale('log')
+        axes[0][3].set_yscale('log')
 
         return axes
 
@@ -267,11 +271,7 @@ class DataExplorer:
         params = self.params.loc[self.params['n_flashes'] > 1]
         bd = self.binary_data.loc[self.params['n_flashes'] > 1]
         md = self.metadata.loc[self.params['n_flashes'] > 1]
-        # fig,axes=plt.subplots(3,4)
-        # axes[0][0].set_yscale('log')
-        # axes[0][1].set_yscale('log')
-        # axes[0][2].set_yscale('log')
-        # axes[0][3].set_yscale('log')
+
         zeros = params.loc[params['species_ID'] == 0]
         ones = params.loc[params['species_ID'] == 1]
         twos = params.loc[params['species_ID'] == 2]
