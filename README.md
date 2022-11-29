@@ -10,12 +10,8 @@ Training the model uses representative sequences for each of the North American 
 
 ## How to run   
 First, install dependencies   
-```bash
-# clone project   
+```
 git clone https://github.com/peleglab/FireflyClassification
-```
-# install project   
-```
 cd FireflyClassification   
 pip install -r requirements.txt
  ```   
