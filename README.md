@@ -25,11 +25,13 @@ Many parameters are exposed at runtime. You can change the number of samples, th
 --n_samples 1000 --n_layers 2 --batch_size 8 --learning_rate 0.00001  --epochs 100 --version 2 --n_classes 4 --downsample
 ```
 
-A useful test of your installation would be running some inference from the loaded checkpoints. Each of the checkpoints represents a fully realized training run with a different data split. Running the example shows the model results on the test dataset for that version of the model.
+A useful test of your installation would be running some inference from the loaded checkpoints. Each of the checkpoints represents a fully realized training run with a different data split. 
 
 ```
 python nn_lightning.py gru --resume_from pretrained_rnn/rnn_iter_{2.0}.ckpt
 ```
+
+This will generate a report of the model results in the terminal, as well as confusion matrices and ROC / PR curves for the particular version and test set in the /figs folder.
 
 ## Imports
 This project is setup as a package which means you can now easily import any file into any other file like so:
