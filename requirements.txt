@@ -10,3 +10,4 @@ scipy
 pandas
 scikit-learn
 seaborn
+fastdtw
