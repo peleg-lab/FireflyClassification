@@ -49,16 +49,13 @@ class FireflyDataModule(pl.LightningDataModule):
         counts = dataset.dataset[dataset.indices][1].value_counts()
         min_balance = min(counts)
         new_indices = []
+
         for sp in np.unique(dataset.dataset._meta_data['species_label']):
             counter = min_balance
             np.random.shuffle(dataset.indices)
-            for index in dataset.indices:
-                if counter == 0:
-                    break
-                else:
-                    if dataset.dataset[index][1] == sp:
-                        new_indices.append(index)
-                        counter -= 1
+            good_indices = np.where(dataset.dataset[dataset.indices][1] == sp)[0]
+            new_indices.extend(list(np.array(dataset.indices)[good_indices[:counter]]))
+
         return new_indices
 
     def train_dataloader(self):
