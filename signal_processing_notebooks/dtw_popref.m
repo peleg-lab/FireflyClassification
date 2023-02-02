@@ -6,9 +6,9 @@
 % !!! Before running, make sure dtw_c.m function is in path !!!
 
 %% Load data
-seqs = readmatrix('../data/real_data/binary_sequences_4.csv');
-labels = readmatrix('../data/real_data/flash_data_4.csv','range',[2 2]);
-params = readmatrix('../data/params_4species.csv');
+seqs = readmatrix('../data/real_data/binary_sequences_7.csv');
+labels = readmatrix('../data/real_data/flash_data_7.csv','range',[2 2]);
+params = readmatrix('../data/params_7species.csv');
 % Exclude sequences with only 1 flash
 seqs(params(:,1)<=1,:) = [];
 labels(params(:,1)<=1,:) = [];
@@ -22,12 +22,15 @@ y_trues = []; % True classes
 y_preds = []; % Predicted classes
 y_scores = []; % Scores
 
-C = zeros(4,4); % Confusion matrix
+C = zeros(num_species,num_species); % Confusion matrix
 num_iter = 100; % Number of iterations with reshuffled data
-w = 1; % dtw window
+w = 100; % dtw window
+
+seed = 1; % random seed
+
 tic;
 for iter = 1:num_iter
-    rng('shuffle');
+    rng(seed+1);
     
     % Build population reference set
     reshuff = randperm(size(seqs,1));
@@ -79,10 +82,11 @@ for iter = 1:num_iter
         predicts = [predicts;prediction];
         scores = [scores;spec_scores];
     end
-    y_true = vertcat(zeros(test_size(1),1),...
-        ones(test_size(2),1),...
-        2*ones(test_size(3),1),...
-        3*ones(test_size(4),1));
+    y_true = [];
+    for i = 1:num_species
+        y_true = vertcat(y_true,(i-1).*ones(test_size(i),1));
+    end
+
     y_true = y_true(:);
     y_pred = predicts;
     y_score = scores;

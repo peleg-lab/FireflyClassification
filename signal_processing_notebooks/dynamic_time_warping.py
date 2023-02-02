@@ -4,17 +4,47 @@ from fastdtw import fastdtw
 from scipy.spatial.distance import euclidean
 from scipy.special import softmax
 from sklearn.metrics import confusion_matrix, classification_report
+import os
 
-def dtwLit(df, literature_sequences):
-    num_species = len(literature_sequences)
-    df = df.sample(frac=1).reset_index(drop=True) # shuffle df
-    Y = df['species_label'].to_numpy()
+def dtwLit(df, literature_sequences, literature_labels, random_seed: int = None):
+    """
+    Computes distance using dynamic time warping between each sample and each literature sequence and predicts species based on the shortest distance
+
+    Parameters:
+    df: pandas dataframe containing species labels (string and numeric) and flash sequence for each sample
+        numerical species label column must be named 'species_label'
+        string species label column must be named 'species'
+    literature_sequences: list of literature sequences
+    literature_labels: list of species corresponding to each literature sequence
+    random_seed: optional seed for random number generator
+
+    Returns:
+    acc: accuracy
+    prec: overall precision
+    rec: overall recall
+    conf_mat: # species x # species confusion matrix
+    y_true: labels of test data
+    y_pred: predicted labels
+    y_score: prediction scores
+    metrics: dict of per-class classification metrics
+    """
+
+    if 'species' not in list(df.columns):
+        raise Exception('species column not found in df')
+    if 'species_label' not in list(df.columns):
+        raise Exception('species_label column not found in df')
+
+    species_with_seq = [df[df['species']==label].iloc[0].species_label for label in literature_labels] # species that have corresponding literature sequences
+    num_species = len(species_with_seq)
+    seed = int.from_bytes(os.urandom(4), byteorder="little") if random_seed is None else random_seed
+    df = df.sample(frac=1, random_state=seed).reset_index(drop=True) # shuffle df
+    np.random.seed(seed)
 
     # Compute predictions for each test set
     predicts = []
     scores = []
 
-    for species in range(num_species):
+    for species in species_with_seq:
         curr_spec_test = df[df['species_label']==species].iloc[:,2:].to_numpy()
         prediction = []
         spec_scores = []
@@ -29,16 +59,18 @@ def dtwLit(df, literature_sequences):
                 dtws.append(distance)
             score = softmax(np.multiply(dtws,-1))
             if np.all(np.isclose(score, score[0])):
-                pred_class = randint(0,high=num_species)
+                # if all scores are the same, randomly choose a species
+                pred_class = species_with_seq[randint(0,high=num_species)]
             else:
-                pred_class = np.argmax(score)
+                # argmax of softmax
+                pred_class = species_with_seq[np.argmax(score)]
             prediction.append(pred_class)
             spec_scores.append(score)
         predicts.append(prediction)
         scores.append(spec_scores)
 
     y_true = []
-    for species in range(num_species):
+    for species in species_with_seq:
         y_true.append(species*np.ones(df['species_label'].value_counts()[species],dtype=np.int8))
     y_true = [i for j in y_true for i in j]
     y_pred = [i for j in predicts for i in j]
