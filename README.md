@@ -22,7 +22,7 @@ This would be best done on a machine that has GPU access. The code will automati
 
 Many parameters are exposed at runtime. You can change the number of samples, the depth of the network, or any of the hyperparameters, as well as name the version and specify how many classes you want to run with. Some of these are shown below, and are usefiul for training.
 ```
---n_samples 1000 --n_layers 2 --batch_size 8 --learning_rate 0.00001  --epochs 100 --version 2 --n_classes 4 --downsample
+--n_layers 2 --batch_size 8 --learning_rate 0.00001  --epochs 500 --version 2 --n_classes 7 --downsample
 ```
 
 A useful test of your installation would be running some inference from the loaded checkpoints. Each of the checkpoints represents a fully realized training run with a different data split. 
