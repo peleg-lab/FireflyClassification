@@ -65,37 +65,44 @@ class Metrics:
 
         y_tests = []
         y_preds = []
-        class_precisions = {3: [], 2: [], 0: [], 1: []}
-        class_f1s = {3: [], 2: [], 0: [], 1: []}
-        class_recalls = {3: [], 2: [], 0: [], 1: []}
+        class_precisions = {'0': [], '1': [], '2': [], '3': [], '4': [], '5': [], '6': [], '7': []}
+        class_f1s = {'0': [], '1': [], '2': [], '3': [], '4': [], '5': [], '6': [], '7': []}
+        class_recalls = {'0': [], '1': [], '2': [], '3': [], '4': [], '5': [], '6': [], '7': []}
         all_reports = []
         for model, d in zip(pretrained_models, data):
             y_pred, y_true = model.probs_at_thresholds(d)
-            cr = classification_report([x for y in y_true for x in y], [x for y in np.argmax(y_pred, axis=2) for x in y], labels=[0,1,2,3],
+            cr = classification_report([x for y in y_true for x in y],
+                                       [x for y in np.argmax(y_pred, axis=2) for x in y],
+                                       labels=list(range(n_classes_model)),
                                        output_dict=True)
             all_reports.append(cr)
-            for c_label in [3,2,0,1]:
-                class_precisions[c_label].append(cr[str(c_label)]['precision'])
-                class_recalls[c_label].append(cr[str(c_label)]['recall'])
-                class_f1s[c_label].append(cr[str(c_label)]['f1-score'])
+            for c_label in range(n_classes_model):
+                class_precisions[str(c_label)].append(cr[str(c_label)]['precision'])
+                class_recalls[str(c_label)].append(cr[str(c_label)]['recall'])
+                class_f1s[str(c_label)].append(cr[str(c_label)]['f1-score'])
             y_true = np.array(y_true).flatten()
             lb = LabelBinarizer()
             lb.fit(y_true)
             y_test = lb.transform(y_true)
             y_tests.append(y_test.reshape(np.array(y_pred).shape))
             y_preds.append(np.array(y_pred))
-        for c_label in [3, 2, 0, 1]:
-            print('Precision for class {}: {}'.format(c_label, np.mean(class_precisions[c_label])))
-            print('Recall for class {}: {}'.format(c_label, np.mean(class_recalls[c_label])))
-            print('f1 for class {}: {}'.format(c_label, np.mean(class_f1s[c_label])))
         if plot:
             self.plot_roc_curve(n_classes_model, y_tests, y_preds)
             self.plot_pre_rec_curve(n_classes_model, y_tests, y_preds)
-            self.report_auroc(y_tests, y_preds)
-            self.report_auprc(y_tests, y_preds)
+            self.report_auroc(n_classes_model, y_tests, y_preds)
+            self.report_auprc(n_classes_model, y_tests, y_preds)
         else:
-            self.report_auroc(y_tests, y_preds)
-            self.report_auprc(y_tests, y_preds)
+            self.report_auroc(n_classes_model, y_tests, y_preds)
+            self.report_auprc(n_classes_model, y_tests, y_preds)
+
+        for c_label in range(n_classes_model):
+            c_label = str(c_label)
+            print('Precision for class {}: {}'.format(c_label, np.mean(class_precisions[c_label])))
+            print('Precision std for class {}: {}'.format(c_label, np.std(class_precisions[c_label])))
+            print('Recall for class {}: {}'.format(c_label, np.mean(class_recalls[c_label])))
+            print('Recall std for class {}: {}'.format(c_label, np.std(class_recalls[c_label])))
+            print('f1 for class {}: {}'.format(c_label, np.mean(class_f1s[c_label])))
+            print('f1 std for class {}: {}'.format(c_label, np.std(class_f1s[c_label])))
 
     def timeseries_and_cm(self, path, cnn=True):
         if cnn:
@@ -123,10 +130,11 @@ class Metrics:
         plt.close(fig)
 
     def plot_roc_curve(self, n_classes_model, y_trues, y_preds):
-        colormap = {0: 'orange', 1: 'olivedrab', 2: 'mediumorchid', 3: 'dodgerblue'}
+        colormap = {0: 'dodgerblue', 1: 'cyan', 2: 'mediumorchid', 3: 'maroon',
+                    4: 'olivedrab', 5: 'orange', 6: 'midnightblue'}
         fig, ax = plt.subplots()
         to_save = {}
-        for (idx, c_label) in enumerate([3, 2, 0, 1]):
+        for (idx, c_label) in enumerate(range(n_classes_model)):
             y_true = self.gather(y_trues, idx)
             y_pred = self.gather(y_preds, idx)
             fpr, tpr, thresholds = roc_curve(y_true, y_pred)
@@ -136,7 +144,6 @@ class Metrics:
                     color=colormap[idx],
                     lw=2,
                     )
-
         ax.plot([0, 1], [0, 1], color="dimgray", lw=2, linestyle="--")
         ax.set_xlim([0.0, 1.0])
         ax.set_ylim([0.0, 1.05])
@@ -147,8 +154,8 @@ class Metrics:
         plt.tight_layout()
         plt.savefig(self.fig_path + '/roc_curves.png')
 
-    def report_auroc(self, y_trues, y_preds):
-        for (idx, c_label) in enumerate([3,2,0,1]):
+    def report_auroc(self, n_classes_model, y_trues, y_preds):
+        for (idx, c_label) in enumerate(range(n_classes_model)):
             y_true = self.gather(y_trues, idx)
             y_pred = self.gather(y_preds, idx)
 
@@ -158,7 +165,7 @@ class Metrics:
     def plot_pre_rec_curve(self, n_classes_model, y_trues, y_preds):
         fig, c_ax = plt.subplots(1, 5, figsize=(25, 3))
         to_save = {}
-        for (idx, c_label) in enumerate([3,2,0,1]):
+        for (idx, c_label) in enumerate(range(n_classes_model)):
             y_true = self.gather(y_trues, c_label)
             y_pred = self.gather(y_preds, c_label)
             len_pos_sample = len([q for q in y_true if q == 1])
@@ -180,8 +187,8 @@ class Metrics:
         plt.tight_layout()
         plt.savefig(self.fig_path + '/pre_rec_curves.png')
 
-    def report_auprc(self, y_trues, y_preds):
-        for (idx, c_label) in enumerate([3,2,0,1]):
+    def report_auprc(self, n_classes_model, y_trues, y_preds):
+        for (idx, c_label) in enumerate(range(n_classes_model)):
             y_true = self.gather(y_trues, idx)
             y_pred = self.gather(y_preds, idx)
 
@@ -190,14 +197,6 @@ class Metrics:
             no_skill = len_pos_sample / total
             auprc = average_precision_score(y_true, y_pred)
             print('Class {}: AuPRC {} vs. baseline {}'.format(c_label, auprc, no_skill))
-
-    @staticmethod
-    def reshuffle(cm):
-        new_cm = np.array([[cm[3,3], cm[3,2], cm[3,0], cm[3,1]],
-                  [cm[2,3], cm[2,2], cm[2,0], cm[2,1]],
-                  [cm[0,3], cm[0,2], cm[0,0], cm[0,1]],
-                  [cm[1,3], cm[1,2], cm[1,0], cm[1,1]]])
-        return new_cm
 
     def plot_cm(self, cm, model_cms, n_classes_model, num_runs, top_2=False):
         acc = round(np.trace(cm) / cm.sum(), 4)
@@ -211,7 +210,6 @@ class Metrics:
         precs = []
         recs = []
         for _cm in model_cms:
-            _cm = self.reshuffle(_cm)
             acc = round(np.trace(_cm) / _cm.sum(), 4)
             true_pos = np.diag(_cm)
             false_pos = np.sum(_cm, axis=0) - true_pos

@@ -22,7 +22,8 @@ class FireflyDataModule(pl.LightningDataModule):
         self.full = RealFlashPatterns(data_root=self.data_dir,
                                       num_species=self.class_limit,
                                       augmentations=augmentations,
-                                      n_classes=self.class_limit)
+                                      n_classes=self.class_limit
+                                      )
 
         # 2. Split into train, val, test data sets
         self.train = None

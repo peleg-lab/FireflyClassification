@@ -19,16 +19,12 @@ class RealFlashPatterns(Dataset):
 
     def _load_flash_data(self, ignore_single_flashes=True):
         # Read flash info
-        if self.n_classes == 5:
-            p = 'real_data/binary_sequences_all.csv'
-            mdp = 'real_data/flash_data_all.csv'
-            pdp = 'params_5species.csv'
-        elif self.n_classes == 4:
-            p = 'real_data/binary_sequences_4.csv'
-            mdp = 'real_data/flash_data_4.csv'
-            pdp = 'params_4species.csv'
+        if self.n_classes == 7:
+            p = 'real_data/binary_sequences_7.csv'
+            mdp = 'real_data/flash_data_7.csv'
+            pdp = 'real_data/params_7species.csv'
         else:
-            raise ValueError('Unsupported number of classes! (can only support 4 or 5 as of 10/03)')
+            raise ValueError('Unsupported number of classes! (only supporting full 7 species dataset right now)')
 
         binary_sequence_path = os.path.join(self._data_root, p)
         binary_df = pd.read_csv(binary_sequence_path, header=None, sep='\0')

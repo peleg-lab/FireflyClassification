@@ -72,7 +72,7 @@ class ModelRunner:
                                                   batch_size=pretrained_model.hparams.batch_size,
                                                   val_split=pretrained_model.hparams.val_split,
                                                   gen_seed=pretrained_model.hparams.gen_seed,
-                                                  downsample=pretrained_model.hparams.downsample
+                                                  downsample=pretrained_model.hparams.downsample,
                                                   )
                         _data = rf_data.test_dataloader()
                     pretrained_models.append(pretrained_model)
