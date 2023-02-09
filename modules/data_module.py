@@ -7,7 +7,7 @@ from modules.dataset import RealFlashPatterns
 
 
 class FireflyDataModule(pl.LightningDataModule):
-    def __init__(self, data_dir, augmentations, class_limit, batch_size, val_split, gen_seed, downsample):
+    def __init__(self, data_dir, augmentations, class_limit, batch_size, val_split, gen_seed, downsample, data_path):
         super().__init__()
         self.data_dir = data_dir
         self.augmentations = augmentations
@@ -16,13 +16,13 @@ class FireflyDataModule(pl.LightningDataModule):
         self.gen_seed = gen_seed
         self.val_split = val_split
         self.downsample = downsample
-        self.data_path = 'default'
 
         # 1. Create full dataset
         self.full = RealFlashPatterns(data_root=self.data_dir,
                                       num_species=self.class_limit,
                                       augmentations=augmentations,
-                                      n_classes=self.class_limit
+                                      n_classes=self.class_limit,
+                                      data_path=data_path
                                       )
 
         # 2. Split into train, val, test data sets
@@ -114,8 +114,8 @@ class FireflyDataModule(pl.LightningDataModule):
 
 
 class RealFireflyData(FireflyDataModule):
-    def __init__(self, data_dir, augmentations, class_limit, batch_size, val_split, gen_seed, downsample):
-        super().__init__(data_dir, augmentations, class_limit, batch_size, val_split, gen_seed, downsample)
+    def __init__(self, data_dir, augmentations, class_limit, batch_size, val_split, gen_seed, downsample, data_path):
+        super().__init__(data_dir, augmentations, class_limit, batch_size, val_split, gen_seed, downsample, data_path)
 
     def train_test_val_split(self, dataset, bs, downsample):
         val_split = self.val_split if self.val_split is not None else 0

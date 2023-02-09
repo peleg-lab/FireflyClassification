@@ -17,6 +17,7 @@ class ModelRunner:
         self.hparams.output_size = self.hparams.n_classes
         self.data_dir = self.hparams.data_dir
         self.dataloaders_dir = self.hparams.dataloaders_dir
+        self.data_file = self.hparams.data_file or 'flash_pattern_data.csv'
         self.metrics = Metrics()
 
         self.rnn_checkpoint_path = "/ckpts/"
@@ -47,7 +48,8 @@ class ModelRunner:
                                        batch_size=pretrained_model.hparams.batch_size,
                                        val_split=pretrained_model.hparams.val_split,
                                        gen_seed=pretrained_model.hparams.gen_seed,
-                                       downsample=pretrained_model.hparams.downsample
+                                       downsample=pretrained_model.hparams.downsample,
+                                       data_path=self.data_file
                                        )
                 pretrained_models = [pretrained_model]
                 self.metrics.eval_metrics(pretrained_models, [data.test_dataloader()],
@@ -73,6 +75,7 @@ class ModelRunner:
                                                   val_split=pretrained_model.hparams.val_split,
                                                   gen_seed=pretrained_model.hparams.gen_seed,
                                                   downsample=pretrained_model.hparams.downsample,
+                                                  data_path=self.data_file
                                                   )
                         _data = rf_data.test_dataloader()
                     pretrained_models.append(pretrained_model)
@@ -86,7 +89,9 @@ class ModelRunner:
                                      batch_size=self.hparams.batch_size,
                                      val_split=self.hparams.val_split,
                                      gen_seed=self.hparams.gen_seed,
-                                     downsample=self.hparams.downsample)
+                                     downsample=self.hparams.downsample,
+                                     data_path=self.data_file
+                                     )
 
             model = LITGRU(self.hparams)
             logger = TensorBoardLogger(save_dir=os.getcwd(),
