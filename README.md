@@ -25,7 +25,7 @@ Many parameters are exposed at runtime. You can change the number of samples, th
 --n_layers 2 --batch_size 8 --learning_rate 0.00001  --epochs 500 --version 2 --n_classes 7 --downsample
 ```
 
-If you do not specify the '--data_file' argument, the model will run with our dataset by default. However, extensions of the dataset can be made, and passed in as a different data file using that argument. If you do extend the dataset and re-train the model, please make sure the columns of the data match what we have provided in 'flash_patterns_data.csv'.
+If you do not specify the '--data_file' argument, the model will run with our dataset by default. However, extensions of the dataset can be made, and passed in as a different data file using that argument. If you do extend the dataset and re-train the model, please make sure the columns of the data match what we have provided in 'flash_pattern_data.csv'.
 
 A useful test of your installation would be running some inference from the loaded checkpoints. Each of the checkpoints represents a fully realized training run with a different data split. 
 
