@@ -60,7 +60,6 @@ class Metrics:
                             cm[i, j] += model_cm[i, j]
                     model_cms.append(model_cm)
             cm = cm / len(pretrained_models)
-            cm = self.reshuffle(cm)
             self.plot_cm(cm, model_cms, n_classes_model, num_runs, top_2=top_2)
 
         y_tests = []
@@ -226,8 +225,8 @@ class Metrics:
         sns.heatmap(cm, linewidths=1, ax=ax, annot=True, fmt=".2g", cmap='viridis')
         ax.set_ylabel('True Species')
         ax.set_xlabel('Predicted Species')
-        ax.set_xticklabels(names.name_dict[n_classes_model], rotation=90)
-        ax.set_yticklabels(names.name_dict[n_classes_model], rotation=0)
+        ax.set_xticklabels(names.name_dict['all_names'], rotation=90)
+        ax.set_yticklabels(names.name_dict['all_names'], rotation=0)
         if not top_2:
             plt.savefig(self.fig_path + '/cm_{}classes_{}acc_{}pre_{}rec.png'.format(
                 n_classes_model, acc, precision, recall, num_runs)
