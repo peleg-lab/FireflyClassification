@@ -65,9 +65,10 @@ def jaccardLit(df, literature_sequences, literature_labels, random_seed: int = N
     Computes Jaccard index between each sample and each literature sequence and predicts species based on the largest value
 
     Parameters:
-    df: pandas dataframe containing species labels (string and numeric) and flash sequence for each sample
+    df: pandas dataframe containing species labels (string and numeric), 3 parameters, and flash sequence for each sample
         numerical species label column must be named 'species_label'
         string species label column must be named 'species'
+        flash sequence column headers must be numeric
     literature_sequences: list of literature sequences
     literature_labels: list of species corresponding to each literature sequence
     random_seed: optional seed for random number generator
@@ -90,6 +91,7 @@ def jaccardLit(df, literature_sequences, literature_labels, random_seed: int = N
 
     species_with_seq = [df[df['species']==label].iloc[0].species_label for label in literature_labels] # species that have corresponding literature sequences
     num_species = len(species_with_seq)
+    seq_cols = [col_ind for col_ind in df.columns.to_list() if isinstance(col_ind,int)] # column indices of flash sequence
     seed = int.from_bytes(os.urandom(4), byteorder="little") if random_seed is None else random_seed
     df = df.sample(frac=1, random_state=seed).reset_index(drop=True) # shuffle df
     np.random.seed(seed)
@@ -100,7 +102,7 @@ def jaccardLit(df, literature_sequences, literature_labels, random_seed: int = N
 
     for species in species_with_seq:
         curr_spec_test = df[df['species_label'] == species]
-        curr_spec_test = curr_spec_test.iloc[:,2:].to_numpy()
+        curr_spec_test = curr_spec_test[seq_cols].to_numpy()
         prediction = []
         spec_scores = []
         for i in range(curr_spec_test.shape[0]):
@@ -145,9 +147,10 @@ def jaccardPop(df, num_iter, train_split, random_seed: int = None):
     Population references are then taken by averaging the sequences in each training subset
 
     Parameters:
-    df: pandas dataframe containing species labels (string and numeric) and flash sequence for each sample
+    df: pandas dataframe containing species labels (string and numeric), 3 parameters, and flash sequence for each sample
         numerical species label column must be named 'species_label'
         string species label column must be named 'species'
+        flash sequence column headers must be numeric
     num_iter: number of iterations to perform with reshuffled data
     train_split: percentage of data used for training
     random_seed: optional seed for random number generator
@@ -171,6 +174,8 @@ def jaccardPop(df, num_iter, train_split, random_seed: int = None):
 
 
     num_species = len(np.unique(df['species_label']))
+    seq_cols = [col_ind for col_ind in df.columns.to_list() if isinstance(col_ind,int)] # column indices of flash sequence
+
     accs = []
     precs = []
     recs = []
@@ -178,7 +183,6 @@ def jaccardPop(df, num_iter, train_split, random_seed: int = None):
     y_preds = []
     y_scores = []
     conf_mat = np.zeros((num_species,num_species))
-    ref_seqs = np.zeros((num_species,df.shape[1]-2))
     precs_sp = np.zeros((num_species, num_iter))
     recs_sp = np.zeros((num_species,num_iter))
     seed = int.from_bytes(os.urandom(4), byteorder="little") if random_seed is None else random_seed
@@ -188,13 +192,13 @@ def jaccardPop(df, num_iter, train_split, random_seed: int = None):
         test_df = df.copy()
         Y = df['species_label'].to_numpy()
         # Generate reference sequences from training sets
-        ref_seqs = np.zeros((num_species,df.shape[1]-2))
+        ref_seqs = np.zeros((num_species,len(seq_cols)))
         for species in np.unique(df['species_label']):
             #downsample
             inds = np.where(Y==species)[0][:np.min(df['species_label'].value_counts())]
             inds_train = inds[:int(train_split*len(inds))]
             curr_spec_train = df.iloc[inds_train,:]
-            curr_spec_train = curr_spec_train.iloc[:,2:].to_numpy()
+            curr_spec_train = curr_spec_train[seq_cols].to_numpy()
             test_df = test_df.drop(inds_train)
             ref_seqs[species,:] = np.nansum(curr_spec_train,axis=0)/curr_spec_train.shape[0]
 
@@ -203,7 +207,7 @@ def jaccardPop(df, num_iter, train_split, random_seed: int = None):
         scores = []
         for species in np.unique(df['species_label']):
             curr_spec_test = test_df[test_df['species_label'] == species]
-            curr_spec_test = curr_spec_test.iloc[:,2:].to_numpy()
+            curr_spec_test = curr_spec_test[seq_cols].to_numpy()
             prediction = []
             spec_scores = []
             for i in range(curr_spec_test.shape[0]):

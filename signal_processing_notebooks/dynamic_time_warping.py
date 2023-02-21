@@ -11,9 +11,10 @@ def dtwLit(df, literature_sequences, literature_labels, random_seed: int = None)
     Computes distance using dynamic time warping between each sample and each literature sequence and predicts species based on the shortest distance
 
     Parameters:
-    df: pandas dataframe containing species labels (string and numeric) and flash sequence for each sample
+    df: pandas dataframe containing species labels (string and numeric), 3 parameters, and flash sequence for each sample
         numerical species label column must be named 'species_label'
         string species label column must be named 'species'
+        flash sequence column headers must be numeric
     literature_sequences: list of literature sequences
     literature_labels: list of species corresponding to each literature sequence
     random_seed: optional seed for random number generator
@@ -36,6 +37,7 @@ def dtwLit(df, literature_sequences, literature_labels, random_seed: int = None)
 
     species_with_seq = [df[df['species']==label].iloc[0].species_label for label in literature_labels] # species that have corresponding literature sequences
     num_species = len(species_with_seq)
+    seq_cols = [col_ind for col_ind in df.columns.to_list() if isinstance(col_ind,int)] # column indices of flash sequence
     seed = int.from_bytes(os.urandom(4), byteorder="little") if random_seed is None else random_seed
     df = df.sample(frac=1, random_state=seed).reset_index(drop=True) # shuffle df
     np.random.seed(seed)
@@ -45,7 +47,7 @@ def dtwLit(df, literature_sequences, literature_labels, random_seed: int = None)
     scores = []
 
     for species in species_with_seq:
-        curr_spec_test = df[df['species_label']==species].iloc[:,2:].to_numpy()
+        curr_spec_test = df[df['species_label']==species][seq_cols].to_numpy()
         prediction = []
         spec_scores = []
         for i in range(curr_spec_test.shape[0]):

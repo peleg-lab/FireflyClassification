@@ -6,9 +6,19 @@
 % !!! Before running, make sure dtw_c.m function is in path !!!
 
 %% Load data
-seqs = readmatrix('../data/real_data/binary_sequences_7.csv');
-labels = readmatrix('../data/real_data/flash_data_7.csv','range',[2 2]);
-params = readmatrix('../data/params_7species.csv');
+data = readtable('../data/real_data/flash_pattern_data.csv');
+% Unpack timeseries
+timeseries = data.timeseries;
+for i = 1:size(timeseries,1)
+    timeseries{i} = str2num(timeseries{i});
+end
+seqs = NaN*zeros(size(timeseries,1),max(cellfun('length',timeseries)));
+for i = 1:size(timeseries,1)
+    seqs(i,1:length(timeseries{i})) = timeseries{i};
+end
+
+labels = data.species_label;
+params = data{:,{'num_flashes','flash_length','ifi'}};
 % Exclude sequences with only 1 flash
 seqs(params(:,1)<=1,:) = [];
 labels(params(:,1)<=1,:) = [];

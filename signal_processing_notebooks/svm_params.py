@@ -13,13 +13,13 @@ def svmLit(df, params_lit, random_seed: int = None):
     df: pandas dataframe containing species label, # flashes, flash length, and gap length for each sample.
         # flashes column must be named 'nf', 'num_flashes', 'num_flash', 'numflashes', or 'numflash'
         flash length column must be named 'fl', 'flash_length', 'flashlength', 'flash'
-        gap length column must be named 'gl', 'gap_length', 'gap', 'ipi'
+        gap length column must be named 'gl', 'gap_length', 'gap', 'ifi', 'ipi'
         numerical species label column must be named 'species_label'
         string species label column must be named 'species'
     params_lit: pandas dataframe containing species label, # flashes, flash length, and gap length for each literature sample
         # flashes column must be named 'nf', 'num_flashes', 'num_flash', 'numflashes', or 'numflash'
         flash length column must be named 'fl', 'flash_length', 'flashlength', 'flash'
-        gap length column must be named 'gl', 'gap_length', 'gap', 'ipi'
+        gap length column must be named 'gl', 'gap_length', 'gap', 'ifi', 'ipi'
         string species label column must be named 'species'
     random_seed: optional seed for random number generator
 
@@ -36,7 +36,7 @@ def svmLit(df, params_lit, random_seed: int = None):
 
     nf_labels = ['nf', 'num_flashes', 'num_flash', 'numflashes', 'numflash']
     fl_labels = ['fl', 'flash_length', 'flashlength', 'flash']
-    gap_labels = ['gl', 'gap_length', 'gap', 'ipi']
+    gap_labels = ['gl', 'gap_length', 'gap', 'ifi', 'ipi']
 
     if not any(label in nf_labels for label in list(df.columns)):
         raise Exception('No number of flashes column found in df')
@@ -98,7 +98,7 @@ def svmPop(df, num_iter, train_split, random_seed: int = None):
     df: pandas dataframe containing species label, # flashes, flash length, and gap length for each sample.
         # flashes column must be named 'nf', 'num_flashes', 'num_flash', 'numflashes', or 'numflash'
         flash length column must be named 'fl', 'flash_length', 'flashlength', 'flash'
-        gap length column must be named 'gl', 'gap_length', 'gap', 'ipi'
+        gap length column must be named 'gl', 'gap_length', 'gap', 'ifi', 'ipi'
         numerical species label column must be named 'species_label'
         string species label column must be named 'species'
     num_iter: number of iterations to perform with reshuffled data
@@ -119,7 +119,7 @@ def svmPop(df, num_iter, train_split, random_seed: int = None):
 
     nf_labels = ['nf', 'num_flashes', 'num_flash', 'numflashes', 'numflash']
     fl_labels = ['fl', 'flash_length', 'flashlength', 'flash']
-    gap_labels = ['gl', 'gap_length', 'gap', 'ipi']
+    gap_labels = ['gl', 'gap_length', 'gap', 'ifi', 'ipi']
 
     if not any(label in nf_labels for label in list(df.columns)):
         raise Exception('No number of flashes column found in df')

@@ -1,0 +1,3 @@
+This folder contains code for classifying firefly sequence data using signal processing methods: dynamic time warping, Jaccard similarity index, dot product, and SVM in 3-dimensional signal parameter space.
+
+The Jupyter notebooks contain code for replicating the results of the paper and plotting the corresponding ROC curves and confusion matrices. The notebooks can be run as-is, while the .py files contain functions for performing classification using either literature-based or data-driven population references. Dynamic time warping using population references is performed in Matlab for faster computation time using dtw_popref.m
