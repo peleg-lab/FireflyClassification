@@ -2,6 +2,7 @@ import numpy as np
 from numpy.random import randint
 from scipy.special import softmax
 from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.model_selection import StratifiedKFold, KFold
 import os
 
 def dotProductLit(df, literature_sequences, literature_labels, random_seed: int = None):
@@ -82,19 +83,20 @@ def dotProductLit(df, literature_sequences, literature_labels, random_seed: int 
     return acc, prec, rec, conf_mat, y_true, y_pred, np.stack(y_score,axis=0), metrics
 
 
-def dotProductPop(df, num_iter, train_split, random_seed: int = None):
+def dotProductPop(df, k, train_split, random_seed: int = None):
     """
-    Computes dot product between each sample and each population reference and predicts species based on the largest value
-    The set of each species' samples is divided into a training subset where the number of training samples is taken to be train_split times the number of samples of the species with the fewest samples,
-    such that each training subset is the same size
-    Population references are then taken by averaging the sequences in each training subset
+    Computes dot product between each sample and each population reference and predicts species based on the largest value.
+    Performs a stratified k-fold cross-validation; then, for each fold, the data is further split into a training set
+    where the number of training samples is taken to be train_split times the number of samples of the species with the fewest samples,
+    such that each training set is the same size. Remaining data is used for testing.
+    Population references are then taken by averaging the sequences in each training sets
 
     Parameters:
     df: pandas dataframe containing species labels (string and numeric), 3 parameters, and flash sequence for each sample
         numerical species label column must be named 'species_label'
         string species label column must be named 'species'
         flash sequence column headers must be numeric
-    num_iter: number of iterations to perform with reshuffled data
+    k: number of stratified folds
     train_split: percentage of data used for training
     random_seed: optional seed for random number generator
 
@@ -125,30 +127,56 @@ def dotProductPop(df, num_iter, train_split, random_seed: int = None):
     y_trues = []
     y_preds = []
     y_scores = []
-    precs_sp = np.zeros((num_species, num_iter))
-    recs_sp = np.zeros((num_species,num_iter))
+    precs_sp = np.zeros((num_species, k))
+    recs_sp = np.zeros((num_species,k))
+
+    class_sizes = df.species_label.value_counts().sort_index().to_numpy() # number of samples in each class, in ascending order of species_label
+
     seed = int.from_bytes(os.urandom(4), byteorder="little") if random_seed is None else random_seed
-    for iter in range(num_iter):
-        np.random.seed(seed+iter)
-        df = df.sample(frac=1, random_state=seed+iter).reset_index(drop=True)
-        test_df = df.copy()
-        Y = df['species_label'].to_numpy()
+    np.random.seed(seed)
+
+    df = df.sample(frac=1, random_state=seed).reset_index(drop=True) # shuffle df
+
+    strat_cv = StratifiedKFold(n_splits=k)
+    for iter, (train_index, test_indices) in enumerate(strat_cv.split(df, df.species_label.values)):
+        train_indices = []
+        test_indices = test_indices.tolist()
+        for c in range(num_species):
+            c_indices = train_index[np.where(df.iloc[train_index].species_label == c)] # get which train indices belong to species c
+            mi = np.min(df.iloc[train_index].species_label.value_counts())
+            k_inner = int(len(c_indices)/(mi*train_split))
+            if k_inner > 1:
+                inner_split = KFold(n_splits=k_inner)
+                for j, (tr_i, te_i) in enumerate(inner_split.split(c_indices)):
+                    if iter % k_inner == j:
+                        train_indices.extend(c_indices[te_i])
+                        test_indices.extend(c_indices[tr_i])
+            else:
+                k_inner = int(len(c_indices)/(len(c_indices) - mi*train_split))
+                inner_split = KFold(n_splits=k_inner)
+                for j, (tr_i, te_i) in enumerate(inner_split.split(c_indices)):
+                    if iter % k_inner == j:
+                        train_indices.extend(c_indices[tr_i])
+                        test_indices.extend(c_indices[te_i])
+
+
+        # all training data
+        df_train = df.iloc[train_indices]
+        # all test data
+        df_test = df.iloc[test_indices]
+
         # Generate reference sequences from training sets
         ref_seqs = np.zeros((num_species,len(seq_cols)))
         for species in np.unique(df['species_label']):
-            #downsample
-            inds = np.where(Y==species)[0][:np.min(df['species_label'].value_counts())]
-            inds_train = inds[:int(train_split*len(inds))]
-            curr_spec_train = df.iloc[inds_train,:]
+            curr_spec_train = df_train[df_train['species_label'] == species]
             curr_spec_train = curr_spec_train[seq_cols].to_numpy()
-            test_df = test_df.drop(inds_train)
             ref_seqs[species,:] = np.nansum(curr_spec_train,axis=0)/curr_spec_train.shape[0]
 
-        # Compute predictions for each test set
+        # Compute predictions for each test sets
         predicts = []
         scores = []
         for species in np.unique(df['species_label']):
-            curr_spec_test = test_df[test_df['species_label'] == species]
+            curr_spec_test = df_test[df_test['species_label'] == species]
             curr_spec_test = curr_spec_test[seq_cols].to_numpy()
             prediction = []
             spec_scores = []
@@ -167,10 +195,9 @@ def dotProductPop(df, num_iter, train_split, random_seed: int = None):
             predicts.append(prediction)
             scores.append(spec_scores)
 
-
         y_true = []
-        for species in np.unique(df['species_label']):
-            y_true.append(species*np.ones(test_df['species_label'].value_counts()[species],dtype=np.int8))
+        for species in np.unique(df_test['species_label']):
+            y_true.append(species*np.ones(df_test['species_label'].value_counts()[species],dtype=np.int8))
         y_true = [i for j in y_true for i in j]
         y_pred = [i for j in predicts for i in j]
         y_score = [i for j in scores for i in j]
@@ -189,4 +216,4 @@ def dotProductPop(df, num_iter, train_split, random_seed: int = None):
             precs_sp[sp,iter] = metrics[str(sp)]['precision']
             recs_sp[sp,iter] = metrics[str(sp)]['recall']
 
-    return accs, precs, recs, conf_mat/num_iter, [i for j in y_trues for i in j], [i for j in y_preds for i in j], np.stack(y_scores,axis=0), precs_sp, recs_sp
+    return accs, precs, recs, conf_mat/k, [i for j in y_trues for i in j], [i for j in y_preds for i in j], np.vstack(y_scores), precs_sp, recs_sp

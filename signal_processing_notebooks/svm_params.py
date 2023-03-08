@@ -2,6 +2,7 @@ import numpy as np
 from sklearn.metrics import confusion_matrix, classification_report
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn import svm
+from sklearn.model_selection import StratifiedKFold, KFold
 import os
 
 def svmLit(df, params_lit, random_seed: int = None):
@@ -89,10 +90,12 @@ def svmLit(df, params_lit, random_seed: int = None):
     y_score = np.stack(y_score,axis=0)
     return acc, prec, rec, conf_mat, y_test, rbf_pred, y_score, metrics
 
-def svmPop(df, num_iter, train_split, random_seed: int = None):
+def svmPop(df, k, train_split, random_seed: int = None):
     """
-    Performs SVM species classification on the 3-parameter space (# of flashes, flash length, gap length) as trained on population reference data and tested on remaining samples
-    The number of training samples for each species is equal, taken to be train_split times the number of samples of the species with the fewest samples
+    Performs SVM species classification on the 3-parameter space (# of flashes, flash length, gap length) 
+    Performs a stratified k-fold cross-validation; then, for each fold, the data is further split into a training set
+    where the number of training samples is taken to be train_split times the number of samples of the species with the fewest samples,
+    such that each training set is the same size. Remaining data is used for testing.
 
     Parameters:
     df: pandas dataframe containing species label, # flashes, flash length, and gap length for each sample.
@@ -101,7 +104,7 @@ def svmPop(df, num_iter, train_split, random_seed: int = None):
         gap length column must be named 'gl', 'gap_length', 'gap', 'ifi', 'ipi'
         numerical species label column must be named 'species_label'
         string species label column must be named 'species'
-    num_iter: number of iterations to perform with reshuffled data
+    k: number of stratified folds
     train_split: percentage of data used for training
     random_seed: optional seed for random number generator
 
@@ -134,7 +137,6 @@ def svmPop(df, num_iter, train_split, random_seed: int = None):
     if not np.issubdtype(df.species_label.dtype, np.number):
         raise Exception('species_label is not numerical')
 
-    seed = int.from_bytes(os.urandom(4), byteorder="little") if random_seed is None else random_seed
     num_species = len(np.unique(df['species_label']))
 
     accs = []
@@ -144,22 +146,50 @@ def svmPop(df, num_iter, train_split, random_seed: int = None):
     y_trues = []
     y_preds = []
     y_scores = []
-    precs_sp = np.zeros((num_species, num_iter))
-    recs_sp = np.zeros((num_species,num_iter))
+    precs_sp = np.zeros((num_species, k))
+    recs_sp = np.zeros((num_species,k))
 
-    for iter in range(num_iter):
-        np.random.seed(seed+iter)
-        df = df.sample(frac=1,random_state=seed+iter).reset_index(drop=True)
-        X = df.iloc[:,[np.where(df.columns.isin(nf_labels))[0][0],
+    seed = int.from_bytes(os.urandom(4), byteorder="little") if random_seed is None else random_seed
+    np.random.seed(seed)
+
+    df = df.sample(frac=1, random_state=seed).reset_index(drop=True) # shuffle df
+
+    strat_cv = StratifiedKFold(n_splits=k)
+    for iter, (train_index, test_indices) in enumerate(strat_cv.split(df, df.species_label.values)):
+        train_indices = []
+        test_indices = test_indices.tolist()
+        for c in range(num_species):
+            c_indices = train_index[np.where(df.iloc[train_index].species_label == c)] # get which train indices belong to species c
+            mi = np.min(df.iloc[train_index].species_label.value_counts())
+            k_inner = int(len(c_indices)/(mi*train_split))
+            if k_inner > 1:
+                inner_split = KFold(n_splits=k_inner)
+                for j, (tr_i, te_i) in enumerate(inner_split.split(c_indices)):
+                    if iter % k_inner == j:
+                        train_indices.extend(c_indices[te_i])
+                        test_indices.extend(c_indices[tr_i])
+            else:
+                k_inner = int(len(c_indices)/(len(c_indices) - mi*train_split))
+                inner_split = KFold(n_splits=k_inner)
+                for j, (tr_i, te_i) in enumerate(inner_split.split(c_indices)):
+                    if iter % k_inner == j:
+                        train_indices.extend(c_indices[tr_i])
+                        test_indices.extend(c_indices[te_i])
+
+
+        # all training data
+        df_train = df.iloc[train_indices]
+        # all test data
+        df_test = df.iloc[test_indices]
+
+        X_train = df_train.iloc[:,[np.where(df.columns.isin(nf_labels))[0][0],
                     np.where(df.columns.isin(fl_labels))[0][0],
                     np.where(df.columns.isin(gap_labels))[0][0]]].to_numpy()
-        Y = df['species_label'].to_numpy()
-        smallest_set = np.min(df['species_label'].value_counts())
-        train_inds = np.hstack(([np.where(Y==sp)[0][:int(train_split*smallest_set)] for sp in np.unique(df['species_label'])]))
-        X_train = X[train_inds]
-        y_train = Y[train_inds]
-        X_test = np.delete(X,train_inds,0)
-        y_test = np.delete(Y,train_inds,0)
+        y_train = df_train['species_label'].to_numpy()
+        X_test = df_test.iloc[:,[np.where(df.columns.isin(nf_labels))[0][0],
+                    np.where(df.columns.isin(fl_labels))[0][0],
+                    np.where(df.columns.isin(gap_labels))[0][0]]].to_numpy()
+        y_test = df_test['species_label'].to_numpy()
 
         rbf = OneVsRestClassifier(svm.SVC(kernel="rbf", gamma=1, C=1)).fit(X_train, y_train)
         y_score = rbf.decision_function(X_test)
@@ -180,4 +210,4 @@ def svmPop(df, num_iter, train_split, random_seed: int = None):
             precs_sp[sp,iter] = metrics[str(sp)]['precision']
             recs_sp[sp,iter] = metrics[str(sp)]['recall']
 
-    return accs, precs, recs, conf_mat/num_iter, [i for j in y_trues for i in j], [i for j in y_preds for i in j], np.stack(y_scores,axis=0), precs_sp, recs_sp
+    return accs, precs, recs, conf_mat/k, [i for j in y_trues for i in j], [i for j in y_preds for i in j], np.vstack(y_scores), precs_sp, recs_sp

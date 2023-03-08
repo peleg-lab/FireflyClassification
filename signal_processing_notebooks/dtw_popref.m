@@ -23,6 +23,10 @@ params = data{:,{'num_flashes','flash_length','ifi'}};
 seqs(params(:,1)<=1,:) = [];
 labels(params(:,1)<=1,:) = [];
 
+% Load train and test indices
+train_indices = csvread('train_indices.csv');
+test_indices = csvread('test_indices.csv');
+reshuff_indices = csvread('reshuff_indices.csv');
 %% Compute DTW and classify
 num_species = length(unique(labels)); % Number of species
 train_split = 0.8; % Training split
@@ -33,29 +37,32 @@ y_preds = []; % Predicted classes
 y_scores = []; % Scores
 
 C = zeros(num_species,num_species); % Confusion matrix
-num_iter = 100; % Number of iterations with reshuffled data
+num_folds = size(train_indices,1); % Number of folds
 w = 100; % dtw window
 
 seed = 1; % random seed
+% reshuffle dataset
+seqs = seqs(reshuff_indices,:);
+labels = labels(reshuff_indices);
 
 tic;
-for iter = 1:num_iter
-    rng(seed+1);
-    
+for fold = 1:num_folds
+    train_ind = train_indices(fold,:);
+    if train_ind(end) == 0
+        train_ind = train_ind(1:(find(train_ind==0,1,'first')-1)); % Each training set is a slightly different size, padded with zeros
+    end
+    test_ind = test_indices(fold,:);
+    if test_ind(end) == 0
+        test_ind = test_ind(1:(find(test_ind==0,1,'first')-1));
+    end
     % Build population reference set
-    reshuff = randperm(size(seqs,1));
-    temp_seq = seqs(reshuff,:);
-    temp_labels = labels(reshuff,:);
-    freqs = [sum(temp_labels==0),sum(temp_labels==1),sum(temp_labels==2),sum(temp_labels==3)];
-    smallest_size = min(freqs); % size of smallest species dataset
-    ref_seqs = zeros(num_species,size(temp_seq,2));
+    ref_seqs = zeros(num_species,size(seqs,2)); 
     for i = 1:num_species
-        inds = find(temp_labels==(i-1));
-        curr_spec = temp_seq(inds(1:smallest_size),:);
-        curr_spec_train = curr_spec(1:round(train_split*smallest_size),:);
+        inds = train_ind(labels(train_ind)==(i-1));
+        curr_spec_train = seqs(inds,:);
         ref_seqs(i,:) = nansum(curr_spec_train,1)./size(curr_spec_train,1);
     end
-    
+
     % Classify
     predicts = [];
     scores = [];
@@ -63,9 +70,8 @@ for iter = 1:num_iter
     for i = 1:num_species
         prediction = [];
         spec_scores = [];
-        inds = find(temp_labels==(i-1));
-        curr_spec = temp_seq(inds,:);
-        curr_spec_test = curr_spec(round(train_split*smallest_size)+1:end,:);
+        inds = test_ind(labels(test_ind)==(i-1));%find(temp_labels==(i-1));
+        curr_spec_test = seqs(inds,:);
         test_size(i) = size(curr_spec_test,1);
         for j = 1:size(curr_spec_test,1)
             seq = curr_spec_test(j,:);
@@ -106,7 +112,7 @@ for iter = 1:num_iter
     y_preds = [y_preds;y_pred];
     y_scores = [y_scores;y_score];
 end
-C = C/num_iter;
+C = C/num_folds;
 toc;
 
 writematrix(y_trues,'dtw_y_true.csv');
