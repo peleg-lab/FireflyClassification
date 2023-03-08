@@ -49,7 +49,8 @@ class ModelRunner:
                                        val_split=pretrained_model.hparams.val_split,
                                        gen_seed=pretrained_model.hparams.gen_seed,
                                        downsample=pretrained_model.hparams.downsample,
-                                       data_path=self.data_file
+                                       data_path=self.data_file,
+                                       flip=pretrained_model.hparams.flip
                                        )
                 pretrained_models = [pretrained_model]
                 self.metrics.eval_metrics(pretrained_models, [data.test_dataloader()],
@@ -61,8 +62,12 @@ class ModelRunner:
                 data = []
                 for i,ckpt in enumerate(os.listdir(p)):
                     ckpt_p = p + '/' + ckpt
-                    pretrained_model = LITGRU.load_from_checkpoint(ckpt_p, map_location=lambda storage, loc: storage)
-
+                    print(ckpt)
+                    try:
+                        pretrained_model = LITGRU.load_from_checkpoint(ckpt_p, map_location=lambda storage, loc: storage)
+                    except Exception:
+                        print('problem w {}'.format(ckpt))
+                        continue
                     pretrained_model.eval()
                     pretrained_model.freeze()
                     if self.hparams.load:
@@ -75,7 +80,8 @@ class ModelRunner:
                                                   val_split=pretrained_model.hparams.val_split,
                                                   gen_seed=pretrained_model.hparams.gen_seed,
                                                   downsample=pretrained_model.hparams.downsample,
-                                                  data_path=self.data_file
+                                                  data_path=self.data_file,
+                                                  flip=self.hparams.flip
                                                   )
                         _data = rf_data.test_dataloader()
                     pretrained_models.append(pretrained_model)
@@ -90,7 +96,8 @@ class ModelRunner:
                                      val_split=self.hparams.val_split,
                                      gen_seed=self.hparams.gen_seed,
                                      downsample=self.hparams.downsample,
-                                     data_path=self.data_file
+                                     data_path=self.data_file,
+                                     flip=self.hparams.flip
                                      )
 
             model = LITGRU(self.hparams)

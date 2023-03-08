@@ -102,6 +102,7 @@ class Metrics:
             print('Recall std for class {}: {}'.format(c_label, np.std(class_recalls[c_label])))
             print('f1 for class {}: {}'.format(c_label, np.mean(class_f1s[c_label])))
             print('f1 std for class {}: {}'.format(c_label, np.std(class_f1s[c_label])))
+        print(all_reports)
 
     def timeseries_and_cm(self, path, cnn=True):
         if cnn:
@@ -132,14 +133,12 @@ class Metrics:
         colormap = {0: 'dodgerblue', 1: 'cyan', 2: 'mediumorchid', 3: 'maroon',
                     4: 'olivedrab', 5: 'orange', 6: 'midnightblue'}
         fig, ax = plt.subplots()
-        to_save = {}
         for (idx, c_label) in enumerate(range(n_classes_model)):
             y_true = self.gather(y_trues, idx)
             y_pred = self.gather(y_preds, idx)
             fpr, tpr, thresholds = roc_curve(y_true, y_pred)
-            to_save[idx] = {'fpr': [f for f in fpr], 'tpr': [t for t in tpr], 'thresholds': [x for x in thresholds]}
             ax.plot(fpr, tpr,
-                    label='{}'.format(names.name_dict[n_classes_model][idx]),
+                    label='{}'.format(names.name_dict['all_names'][idx]),
                     color=colormap[idx],
                     lw=2,
                     )
@@ -163,7 +162,6 @@ class Metrics:
 
     def plot_pre_rec_curve(self, n_classes_model, y_trues, y_preds):
         fig, c_ax = plt.subplots(1, 5, figsize=(25, 3))
-        to_save = {}
         for (idx, c_label) in enumerate(range(n_classes_model)):
             y_true = self.gather(y_trues, c_label)
             y_pred = self.gather(y_preds, c_label)
@@ -171,7 +169,6 @@ class Metrics:
             total = len(y_true)
             no_skill = len_pos_sample / total
             precision, recall, thresholds = precision_recall_curve(y_true, y_pred)
-            to_save[idx] = {'precision': [p for p in precision], 'recall': [r for r in recall], 'thresholds': [t for t in thresholds]}
             c_ax[idx].plot(recall, precision,
                            label='Precision-recall curve (species %i)'.format(c_label),
                            color="maroon",
@@ -182,7 +179,7 @@ class Metrics:
             c_ax[idx].set_ylim([0.0, 1.05])
             c_ax[idx].set_xlabel("Recall")
             c_ax[idx].set_ylabel("Precision")
-            c_ax[idx].set_title("{}".format(names.name_dict[n_classes_model][c_label]))
+            c_ax[idx].set_title("{}".format(names.name_dict['all_names'][c_label]))
         plt.tight_layout()
         plt.savefig(self.fig_path + '/pre_rec_curves.png')
 

@@ -267,6 +267,8 @@ class LITGRU(pl.LightningModule):
                                help='Whether to downsample to the smallest class dataset size')
         subparser.add_argument('--model', type=str, default='gru',
                                help='Model type (should be first)')
+        subparser.add_argument('--flip', type=int, default=0,
+                               help='Use imbalanced set as training instead of test')
         subparser.set_defaults(load=False)
         subparser.set_defaults(enable_progress_bar=False)
         return subparser

@@ -2,12 +2,13 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 from torch.utils.data import random_split, DataLoader
+import sklearn
 
 from modules.dataset import RealFlashPatterns
 
 
 class FireflyDataModule(pl.LightningDataModule):
-    def __init__(self, data_dir, augmentations, class_limit, batch_size, val_split, gen_seed, downsample, data_path):
+    def __init__(self, data_dir, augmentations, class_limit, batch_size, val_split, gen_seed, downsample, data_path, flip):
         super().__init__()
         self.data_dir = data_dir
         self.augmentations = augmentations
@@ -16,6 +17,7 @@ class FireflyDataModule(pl.LightningDataModule):
         self.gen_seed = gen_seed
         self.val_split = val_split
         self.downsample = downsample
+        self.flip = flip
 
         # 1. Create full dataset
         self.full = RealFlashPatterns(data_root=self.data_dir,
@@ -53,8 +55,9 @@ class FireflyDataModule(pl.LightningDataModule):
 
         for sp in np.unique(dataset.dataset._meta_data['species_label']):
             counter = min_balance
-            np.random.shuffle(dataset.indices)
             good_indices = np.where(dataset.dataset[dataset.indices][1] == sp)[0]
+            np.random.shuffle(good_indices)
+
             new_indices.extend(list(np.array(dataset.indices)[good_indices[:counter]]))
 
         return new_indices
@@ -94,28 +97,81 @@ class FireflyDataModule(pl.LightningDataModule):
             if self.gen_seed is None:
                 gen_seed = 42.0
 
+        # CVl
+        k = 60
+        strat_cv = sklearn.model_selection.StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
+        train_indices = []
+        valid_indices = []
+
+        for i, (train_index, test_index) in enumerate(strat_cv.split(dataset, dataset._meta_data.species_label.values)):
+            if i != int(gen_seed):
+                continue
+            else:
+                for c in range(self.class_limit):
+                    c_indices = train_index[np.where(dataset[train_index][1] == c)]
+                    ma = len(c_indices)
+                    mi = min(dataset[train_index][1].value_counts())
+                    k_i = int(ma / (mi*0.8))
+                    if k_i > 1:
+                        folds = sklearn.model_selection.KFold(n_splits=k_i, shuffle=True, random_state=42)
+                        for j, (tr_i, t_i) in enumerate(folds.split(c_indices)):
+                            if i % k_i == j:
+                                train_indices.extend(c_indices[t_i])
+                    else:
+                        k_i = int(ma / (ma - 0.8*mi))
+                        folds = sklearn.model_selection.KFold(n_splits=k_i, shuffle=True, random_state=42)
+                        for j, (tr_i, t_i) in enumerate(folds.split(c_indices)):
+                            if i % k_i == j:
+                                train_indices.extend(c_indices[tr_i])
+
+                    v_indices = test_index[np.where(dataset[test_index][1] == c)]
+                    va = len(v_indices)
+                    vi = min(dataset[test_index][1].value_counts())
+                    k_v = int(va / (vi*0.8))
+
+                    if k_v > 1:
+                        folds = sklearn.model_selection.KFold(n_splits=k_v, shuffle=True, random_state=42)
+                        for jv, (tv_i, v_i) in enumerate(folds.split(v_indices)):
+                            if i % k_v == jv:
+                                valid_indices.extend(v_indices[v_i])
+                    else:
+                        k_v = int(ma / (ma - 0.8*mi))
+                        folds = sklearn.model_selection.KFold(n_splits=k_v, shuffle=True, random_state=42)
+                        for jv, (tv_i, v_i) in enumerate(folds.split(v_indices)):
+                            if i % k_v == jv:
+                                valid_indices.extend(v_indices[tv_i])
+
+        # end cv
+        # make subset objects
         train_dataset, valid_dataset, test_dataset = random_split(
             dataset=dataset, lengths=[n_train, n_val, n_test], generator=torch.Generator().manual_seed(gen_seed)
         )
 
-        print('done splitting data into {} train/{} validation/{} test sequences...'.format(len(train_dataset),
-                                                                                            len(valid_dataset),
-                                                                                            len(test_dataset)))
+        # override subset indices
         if downsample != 0:
+            np.random.seed(self.gen_seed)
             print("Downsampling selected")
-            train_dataset.indices = self.downsample_dataset(train_dataset)
-            valid_dataset.indices = self.downsample_dataset(valid_dataset)
-            test_dataset.indices = self.downsample_dataset(test_dataset)
-            print("Downsampling done, {} samples per species in training set".format(
-                len(train_dataset.indices) / self.class_limit)
-            )
-
+            train_dataset.indices = train_indices
+            np.random.shuffle(train_dataset.indices)
+            valid_dataset.indices = valid_indices
+            np.random.shuffle(valid_dataset.indices)
+            test_dataset.indices = [idx for idx in set(range(len(dataset)))
+                                    if idx not in set(train_indices+valid_indices)]
+            np.random.shuffle(test_dataset.indices)
+           # train_dataset.indices = self.downsample_dataset(train_dataset)
+           # valid_dataset.indices = self.downsample_dataset(valid_dataset)
+           # test_dataset.indices = self.downsample_dataset(test_dataset)
+            print('done splitting data into {} train/{} validation/{} test sequences...'.format(len(train_dataset),
+                                                                                                len(valid_dataset),
+                                                                                                len(test_dataset)))
+        if self.flip:
+            return test_dataset, valid_dataset, train_dataset
         return train_dataset, valid_dataset, test_dataset
 
 
 class RealFireflyData(FireflyDataModule):
-    def __init__(self, data_dir, augmentations, class_limit, batch_size, val_split, gen_seed, downsample, data_path):
-        super().__init__(data_dir, augmentations, class_limit, batch_size, val_split, gen_seed, downsample, data_path)
+    def __init__(self, data_dir, augmentations, class_limit, batch_size, val_split, gen_seed, downsample, data_path, flip):
+        super().__init__(data_dir, augmentations, class_limit, batch_size, val_split, gen_seed, downsample, data_path, flip)
 
     def train_test_val_split(self, dataset, bs, downsample):
         val_split = self.val_split if self.val_split is not None else 0
@@ -140,22 +196,71 @@ class RealFireflyData(FireflyDataModule):
             if self.gen_seed is None:
                 gen_seed = 42.0
 
+        # CVl
+        k = 60
+        strat_cv = sklearn.model_selection.StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
+        train_indices = []
+        valid_indices = []
+        for i, (train_index, test_index) in enumerate(strat_cv.split(dataset, dataset._meta_data.species_label.values)):
+            if i != int(gen_seed):
+                continue
+            else:
+                #train_indices = []
+                #valid_indices = []
+                for c in range(self.class_limit):
+                    c_indices = train_index[np.where(dataset[train_index][1] == c)]
+                    ma = len(c_indices)
+                    mi = len(train_index[np.where(dataset[train_index][1] == 1)])
+                    k_i = int(ma / (mi*0.8))
+                    if k_i > 1:
+                        folds = sklearn.model_selection.KFold(n_splits=k_i, shuffle=True, random_state=42)
+                        for j, (tr_i, t_i) in enumerate(folds.split(c_indices)):
+                            if i % k_i == j:
+                                train_indices.extend(c_indices[t_i])
+                    else:
+                        k_i = int(ma / (ma - 0.8*mi))
+                        folds = sklearn.model_selection.KFold(n_splits=k_i, shuffle=True, random_state=42)
+                        for j, (tr_i, t_i) in enumerate(folds.split(c_indices)):
+                            if i % k_i == j:
+                                train_indices.extend(c_indices[tr_i])
+
+                    v_indices = test_index[np.where(dataset[test_index][1] == c)]
+                    va = len(v_indices)
+                    vi = len(test_index[np.where(dataset[test_index][1] == 1)])
+                    k_v = int(va / (vi*0.8))
+
+                    if k_v > 1:
+                        folds = sklearn.model_selection.KFold(n_splits=k_v, shuffle=True, random_state=42)
+                        for jv, (tv_i, v_i) in enumerate(folds.split(v_indices)):
+                            if i % k_v == jv:
+                                valid_indices.extend(v_indices[v_i])
+                    else:
+                        k_v = int(ma / (ma - 0.8*mi))
+                        folds = sklearn.model_selection.KFold(n_splits=k_v, shuffle=True, random_state=42)
+                        for jv, (tv_i, v_i) in enumerate(folds.split(v_indices)):
+                            if i % k_v == jv:
+                                valid_indices.extend(v_indices[tv_i])
+
+        # end cv
+        # make subset objects
         train_dataset, valid_dataset, test_dataset = random_split(
             dataset=dataset, lengths=[n_train, n_val, n_test], generator=torch.Generator().manual_seed(gen_seed)
         )
+
+        # override subset indices
         if downsample != 0:
+            np.random.seed(self.gen_seed)
             print("Downsampling selected")
-            former_indices = [x for x in train_dataset.indices]
-            train_dataset.indices = self.downsample_dataset(train_dataset)
-            s = set(train_dataset.indices)
-            extra_test = [x for x in former_indices if x not in s]
-            test_dataset.indices.extend(extra_test)
-
-            print("Downsampling done, {} samples per species in training set".format(
-                len(train_dataset.indices) / self.class_limit)
-            )
-
-        print('done splitting data into {} train/{} validation/{} test sequences...'.format(len(train_dataset),
-                                                                                            len(valid_dataset),
-                                                                                            len(test_dataset)))
+            train_dataset.indices = train_indices
+            np.random.shuffle(train_dataset.indices)
+            valid_dataset.indices = valid_indices
+            np.random.shuffle(valid_dataset.indices)
+            test_dataset.indices = [idx for idx in set(range(len(dataset)))
+                                    if idx not in set(train_indices + valid_indices)]
+            np.random.shuffle(test_dataset.indices)
+            print('done splitting data into {} train/{} validation/{} test sequences...'.format(len(train_dataset),
+                                                                                                len(valid_dataset),
+                                                                                                len(test_dataset)))
+        if self.flip:
+            return test_dataset, valid_dataset, train_dataset
         return train_dataset, valid_dataset, test_dataset
