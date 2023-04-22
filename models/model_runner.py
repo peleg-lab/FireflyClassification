@@ -50,7 +50,7 @@ class ModelRunner:
                                        gen_seed=pretrained_model.hparams.gen_seed,
                                        downsample=pretrained_model.hparams.downsample,
                                        data_path=self.data_file,
-                                       flip=pretrained_model.hparams.flip
+                                       flip=False#pretrained_model.hparams.flip
                                        )
                 pretrained_models = [pretrained_model]
                 self.metrics.eval_metrics(pretrained_models, [data.test_dataloader()],

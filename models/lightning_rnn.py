@@ -311,13 +311,17 @@ class LITGRU(pl.LightningModule):
         y_true = []
         topx = 2
         y_pred_topx = []
+        softmax_indices_for_each_class = {0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: []}
         if plot_clusters:
             fig = plt.figure(figsize=(6, 6))
             ax = Axes3D(fig)
         with torch.no_grad():  # Deactivate gradients for the following code
-            for data_inputs, data_labels, data_names in test_dataloader:
+            indexx = 0
+            for data_inputs, data_labels, data_names, in test_dataloader:
                 # Determine prediction of model on test set
                 x, y, _ = data_inputs, data_labels, data_names
+                indices = test_dataloader.dataset.indices[indexx:indexx+test_dataloader.batch_size]
+                indexx += test_dataloader.batch_size
                 seq_lens = []
                 for _x_ in x:
                     z = numpy.where(_x_.cpu() != 2)[0]
@@ -335,6 +339,12 @@ class LITGRU(pl.LightningModule):
                 output_logits = batch_output.permute(1, 0, 2)
                 final_logit = output_logits[-1]
                 softmax_vals = nn.Softmax(dim=1)(final_logit)
+                for i,j in enumerate(softmax_vals):
+                    max_prob = j.max().item()
+                    tru = y[i].item()
+                    pre = j.argmax().item()
+                    if tru == pre:
+                        softmax_indices_for_each_class[tru].append((indices[i], max_prob))
                 y_pred.extend(list(softmax_vals.argmax(dim=1).cpu().detach().numpy()))
                 y_true.extend(list(y.cpu().detach().numpy()))
                 y_pred_topx.extend(list([x[:topx] for x in (-softmax_vals).argsort()]))
