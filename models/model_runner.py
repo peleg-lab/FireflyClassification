@@ -50,7 +50,8 @@ class ModelRunner:
                                        gen_seed=pretrained_model.hparams.gen_seed,
                                        downsample=pretrained_model.hparams.downsample,
                                        data_path=self.data_file,
-                                       flip=False#pretrained_model.hparams.flip
+                                       flip=False,
+                                       dataset_date=self.hparams.dataset_date
                                        )
                 pretrained_models = [pretrained_model]
                 self.metrics.eval_metrics(pretrained_models, [data.test_dataloader()],
@@ -81,7 +82,8 @@ class ModelRunner:
                                                   gen_seed=pretrained_model.hparams.gen_seed,
                                                   downsample=pretrained_model.hparams.downsample,
                                                   data_path=self.data_file,
-                                                  flip=self.hparams.flip
+                                                  flip=self.hparams.flip,
+                                                  dataset_date=self.hparams.dataset_date
                                                   )
                         _data = rf_data.test_dataloader()
                     pretrained_models.append(pretrained_model)
