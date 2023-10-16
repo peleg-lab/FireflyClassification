@@ -269,6 +269,8 @@ class LITGRU(pl.LightningModule):
                                help='Model type (should be first)')
         subparser.add_argument('--flip', type=int, default=0,
                                help='Use imbalanced set as training instead of test')
+        subparser.add_argument('--dataset_date', type=str, default='',
+                               help='Exclude a date from training (to be tested on downstream)')
         subparser.set_defaults(load=False)
         subparser.set_defaults(enable_progress_bar=False)
         return subparser

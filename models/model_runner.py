@@ -17,7 +17,7 @@ class ModelRunner:
         self.hparams.output_size = self.hparams.n_classes
         self.data_dir = self.hparams.data_dir
         self.dataloaders_dir = self.hparams.dataloaders_dir
-        self.data_file = self.hparams.data_file or 'flash_pattern_data.csv'
+        self.data_file = self.hparams.data_file or 'flash_sequence_data.csv'
         self.metrics = Metrics()
 
         self.rnn_checkpoint_path = "/ckpts/"
@@ -97,7 +97,8 @@ class ModelRunner:
                                      gen_seed=self.hparams.gen_seed,
                                      downsample=self.hparams.downsample,
                                      data_path=self.data_file,
-                                     flip=self.hparams.flip
+                                     flip=self.hparams.flip,
+                                     dataset_date=self.hparams.dataset_date
                                      )
 
             model = LITGRU(self.hparams)
