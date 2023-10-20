@@ -91,7 +91,10 @@ class LITGRU(pl.LightningModule):
 
         softmax_vals = nn.Softmax(dim=1)(final_logit)
         preds = softmax_vals.argmax(dim=1)
-        acc = torchmetrics.functional.accuracy(preds, y)
+        acc = torchmetrics.functional.accuracy(preds,
+                                               y,
+                                               task='multiclass',
+                                               num_labels=self.hparams['n_classes'])
 
         self.log_dict(
             {
@@ -141,7 +144,9 @@ class LITGRU(pl.LightningModule):
         # compute acc
         softmax_vals = nn.Softmax(dim=1)(final_logit)
         preds = softmax_vals.argmax(dim=1)
-        acc = torchmetrics.functional.accuracy(preds, y)
+        acc = torchmetrics.functional.accuracy(preds, y,
+                                               task='multiclass',
+                                               num_labels=self.hparams['n_classes'])
         self.log_dict(
             {
                 "val_loss": loss,
@@ -259,7 +264,7 @@ class LITGRU(pl.LightningModule):
         # training specific (for this model)
         subparser.add_argument('--n_classes', default=4, type=int,
                                help='Number of classes in the training data')
-        subparser.add_argument('--gen_seed', default=42, type=int,
+        subparser.add_argument('--gen_seed', default=42.0, type=float,
                                help='Seed for the test train split')
         subparser.add_argument('--val_split', default=0.10, type=float,
                                help='Test data ratio (0.10 = 10% of data is in the test set')
@@ -347,6 +352,7 @@ class LITGRU(pl.LightningModule):
                     pre = j.argmax().item()
                     if tru == pre:
                         softmax_indices_for_each_class[tru].append((indices[i], max_prob))
+
                 y_pred.extend(list(softmax_vals.argmax(dim=1).cpu().detach().numpy()))
                 y_true.extend(list(y.cpu().detach().numpy()))
                 y_pred_topx.extend(list([x[:topx] for x in (-softmax_vals).argsort()]))
@@ -427,6 +433,7 @@ class LITGRU(pl.LightningModule):
 
     @staticmethod
     def pca_cluster(hidden, y, ax):
+
         pca = PCA(n_components=3)
         pca_results = pca.fit_transform(hidden[1])
         d = dict()
@@ -435,20 +442,18 @@ class LITGRU(pl.LightningModule):
         d['pca-three'] = pca_results[:, 2]
         d['y'] = y
         df = pd.DataFrame(d)
-        colors = {0: 'orange',
-                  1: 'mediumorchid',
-                  2: 'olivedrab',
-                  3: 'dodgerblue'}
+        colors = {0: 'dodgerblue', 1: 'cyan', 2: 'mediumorchid', 3: 'maroon',
+                    4: 'olivedrab', 5: 'orange', 6: 'midnightblue'}
 
         for s in df.y.unique():
-            if s == 0:
-                mask = (df['y'] == s) & (df['pca-two'] > 5)
-            elif s == 1:
-                mask = (df['y'] == s) & (df['pca-one'] < 0)
-            elif s == 2:
-                mask = (df['y'] == s) & (df['pca-one'] > 0)
-            else:
-                mask = (df['y'] == s)
+            # if s == 0:
+            #     mask = (df['y'] == s) & (df['pca-two'] > 5)
+            # elif s == 1:
+            #     mask = (df['y'] == s) & (df['pca-one'] < 0)
+            # elif s == 2:
+            #     mask = (df['y'] == s) & (df['pca-one'] > 0)
+            # else:
+            mask = (df['y'] == s)
 
             ax.scatter(df['pca-one'][mask], df['pca-two'][mask], df['pca-three'][mask], color=colors[s],
                        alpha=0.8)
