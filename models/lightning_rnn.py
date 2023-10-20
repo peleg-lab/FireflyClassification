@@ -94,7 +94,7 @@ class LITGRU(pl.LightningModule):
         acc = torchmetrics.functional.accuracy(preds,
                                                y,
                                                task='multiclass',
-                                               num_labels=self.hparams['n_classes'])
+                                               num_classes=self.hparams['n_classes'])
 
         self.log_dict(
             {
@@ -146,7 +146,7 @@ class LITGRU(pl.LightningModule):
         preds = softmax_vals.argmax(dim=1)
         acc = torchmetrics.functional.accuracy(preds, y,
                                                task='multiclass',
-                                               num_labels=self.hparams['n_classes'])
+                                               num_classes=self.hparams['n_classes'])
         self.log_dict(
             {
                 "val_loss": loss,
