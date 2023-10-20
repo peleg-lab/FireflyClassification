@@ -191,11 +191,10 @@ class FireflyDataModule(pl.LightningDataModule):
                 else:
                     for c in range(self.class_limit):
                         c_indices = train_index[np.where(included_dataset.iloc[train_index]['species_label'] == c)]
-                        if c == excluded_dataset.iloc[0].species_label:
-                            set1 = set(c_indices)
-                            set2 = set(excluded_dataset.index.tolist())
+                        set1 = set(c_indices)
+                        set2 = set(excluded_dataset.index.tolist())
 
-                            c_indices = np.array(list(set1.difference(set2)))
+                        c_indices = np.array(list(set1.difference(set2)))
                         ma = len(c_indices)
                         mi = min(included_dataset.iloc[train_index]['species_label'].value_counts())
                         k_i = int(ma / (mi * 0.8))
@@ -212,11 +211,10 @@ class FireflyDataModule(pl.LightningDataModule):
                                     train_indices.extend(c_indices[tr_i])
 
                         v_indices = test_index[np.where(included_dataset.iloc[test_index]['species_label'] == c)]
-                        if c == excluded_dataset.iloc[0].species_label:
-                            set1 = set(v_indices)
-                            set2 = set(excluded_dataset.index.tolist())
+                        set1 = set(v_indices)
+                        set2 = set(excluded_dataset.index.tolist())
 
-                            v_indices = np.array(list(set1.difference(set2)))
+                        v_indices = np.array(list(set1.difference(set2)))
                         va = len(v_indices)
                         vi = min(included_dataset.iloc[test_index]['species_label'].value_counts())
                         k_v = int(va / (vi * 0.8))
@@ -260,9 +258,10 @@ class FireflyDataModule(pl.LightningDataModule):
         if self.date_to_exclude == '':
             return None, df
         else:
-            split = df.groupby('Dataset')
-            exclude_df = split.get_group(self.date_to_exclude)
-            rest_df = df[df['Dataset'] != self.date_to_exclude]
+            dates_to_exclude = self.date_to_exclude.split(',')
+            exclude_df = df[df['Dataset'].isin(dates_to_exclude)]
+            rest_df = df[~df['Dataset'].isin(dates_to_exclude)]
+
             return exclude_df, rest_df
 
 

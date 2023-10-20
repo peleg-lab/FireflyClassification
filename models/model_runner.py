@@ -96,7 +96,7 @@ class ModelRunner:
                                      class_limit=self.hparams.n_classes,
                                      batch_size=self.hparams.batch_size,
                                      val_split=self.hparams.val_split,
-                                     gen_seed=self.hparams.gen_seed,
+                                     gen_seed=self.hparams.version,
                                      downsample=self.hparams.downsample,
                                      data_path=self.data_file,
                                      flip=self.hparams.flip,
