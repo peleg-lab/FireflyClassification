@@ -204,10 +204,13 @@ class FireflyDataModule(pl.LightningDataModule):
                                     train_indices.extend(c_indices[t_i])
                         else:
                             k_i = int(ma / (ma - 0.8 * mi))
-                            folds = sklearn.model_selection.KFold(n_splits=k_i, shuffle=True, random_state=self.gen_seed)
-                            for j, (tr_i, t_i) in enumerate(folds.split(c_indices)):
-                                if i % k_i == j:
-                                    train_indices.extend(c_indices[tr_i])
+                            if k_i > 1:
+                                folds = sklearn.model_selection.KFold(n_splits=k_i, shuffle=True, random_state=self.gen_seed)
+                                for j, (tr_i, t_i) in enumerate(folds.split(c_indices)):
+                                    if i % k_i == j:
+                                        train_indices.extend(c_indices[tr_i])
+                            else:
+                                train_indices.extend(c_indices)
 
                         v_indices = test_index[np.where(included_dataset.iloc[test_index]['species_label'] == c)]
                         set1 = set(v_indices)
@@ -225,10 +228,13 @@ class FireflyDataModule(pl.LightningDataModule):
                                     valid_indices.extend(v_indices[v_i])
                         else:
                             k_v = int(ma / (ma - 0.8 * mi))
-                            folds = sklearn.model_selection.KFold(n_splits=k_v, shuffle=True, random_state=self.gen_seed)
-                            for jv, (tv_i, v_i) in enumerate(folds.split(v_indices)):
-                                if i % k_v == jv:
-                                    valid_indices.extend(v_indices[tv_i])
+                            if k_v > 1:
+                                folds = sklearn.model_selection.KFold(n_splits=k_v, shuffle=True, random_state=self.gen_seed)
+                                for jv, (tv_i, v_i) in enumerate(folds.split(v_indices)):
+                                    if i % k_v == jv:
+                                        valid_indices.extend(v_indices[tv_i])
+                            else:
+                                valid_indices.extend(v_indices)
 
             # end cv
             # make subset objects
