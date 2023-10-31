@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pytorch_lightning as pl
 import torch
 from torch.utils.data import random_split, DataLoader
@@ -9,7 +10,7 @@ from modules.dataset import RealFlashPatterns
 
 class FireflyDataModule(pl.LightningDataModule):
     def __init__(self, data_dir, augmentations, class_limit, batch_size, val_split, gen_seed, downsample, data_path,
-                 flip, dataset_date):
+                 flip, dataset_date, dataset_ratio):
         super().__init__()
         self.data_dir = data_dir
         self.augmentations = augmentations
@@ -20,6 +21,7 @@ class FireflyDataModule(pl.LightningDataModule):
         self.downsample = downsample
         self.flip = flip
         self.date_to_exclude = dataset_date
+        self.dataset_ratio = dataset_ratio
 
         # 1. Create full dataset
         self.full = RealFlashPatterns(data_root=self.data_dir,
@@ -98,7 +100,7 @@ class FireflyDataModule(pl.LightningDataModule):
                 n_val = 0
                 n_test = len(dataset)
                 if self.gen_seed is None:
-                    gen_seed = 42
+                    self.gen_seed = 42
         else:
             print('Keeping {} in the test set, splitting rest of data into train and validation sets'.format(
                 self.date_to_exclude))
@@ -114,13 +116,26 @@ class FireflyDataModule(pl.LightningDataModule):
                     n_train += 1
                     diff = dataset_size - (n_train + n_val + n_test)
 
+        train_dataset, valid_dataset, test_dataset = self.cv(
+            excluded_dataset,
+            included_dataset,
+            dataset,
+            n_train, n_val, n_test,
+            downsample,
+            k=60
+        )
+        if self.flip:
+            return test_dataset, valid_dataset, train_dataset
+        return train_dataset, valid_dataset, test_dataset
+
+    def cv(self, excluded_dataset, included_dataset, dataset, n_train, n_val, n_test, downsample, k):
         # CVl
-        k = 60
         strat_cv = sklearn.model_selection.StratifiedKFold(n_splits=k, shuffle=True, random_state=self.gen_seed)
         train_indices = []
         valid_indices = []
         if excluded_dataset is None:
-            for i, (train_index, test_index) in enumerate(strat_cv.split(dataset, dataset._meta_data.species_label.values)):
+            for i, (train_index, test_index) in enumerate(
+                    strat_cv.split(dataset, dataset._meta_data.species_label.values)):
                 if i != self.gen_seed:
                     continue
                 else:
@@ -128,15 +143,17 @@ class FireflyDataModule(pl.LightningDataModule):
                         c_indices = train_index[np.where(dataset[train_index][1] == c)]
                         ma = len(c_indices)
                         mi = min(dataset[train_index][1].value_counts())
-                        k_i = int(ma / (mi*0.8))
+                        k_i = int(ma / (mi * 0.8))
                         if k_i > 1:
-                            folds = sklearn.model_selection.KFold(n_splits=k_i, shuffle=True, random_state=self.gen_seed)
+                            folds = sklearn.model_selection.KFold(n_splits=k_i, shuffle=True,
+                                                                  random_state=self.gen_seed)
                             for j, (tr_i, t_i) in enumerate(folds.split(c_indices)):
                                 if i % k_i == j:
                                     train_indices.extend(c_indices[t_i])
                         else:
-                            k_i = int(ma / (ma - 0.8*mi))
-                            folds = sklearn.model_selection.KFold(n_splits=k_i, shuffle=True, random_state=self.gen_seed)
+                            k_i = int(ma / (ma - 0.8 * mi))
+                            folds = sklearn.model_selection.KFold(n_splits=k_i, shuffle=True,
+                                                                  random_state=self.gen_seed)
                             for j, (tr_i, t_i) in enumerate(folds.split(c_indices)):
                                 if i % k_i == j:
                                     train_indices.extend(c_indices[tr_i])
@@ -144,16 +161,18 @@ class FireflyDataModule(pl.LightningDataModule):
                         v_indices = test_index[np.where(dataset[test_index][1] == c)]
                         va = len(v_indices)
                         vi = min(dataset[test_index][1].value_counts())
-                        k_v = int(va / (vi*0.8))
+                        k_v = int(va / (vi * 0.8))
 
                         if k_v > 1:
-                            folds = sklearn.model_selection.KFold(n_splits=k_v, shuffle=True, random_state=self.gen_seed)
+                            folds = sklearn.model_selection.KFold(n_splits=k_v, shuffle=True,
+                                                                  random_state=self.gen_seed)
                             for jv, (tv_i, v_i) in enumerate(folds.split(v_indices)):
                                 if i % k_v == jv:
                                     valid_indices.extend(v_indices[v_i])
                         else:
-                            k_v = int(ma / (ma - 0.8*mi))
-                            folds = sklearn.model_selection.KFold(n_splits=k_v, shuffle=True, random_state=self.gen_seed)
+                            k_v = int(ma / (ma - 0.8 * mi))
+                            folds = sklearn.model_selection.KFold(n_splits=k_v, shuffle=True,
+                                                                  random_state=self.gen_seed)
                             for jv, (tv_i, v_i) in enumerate(folds.split(v_indices)):
                                 if i % k_v == jv:
                                     valid_indices.extend(v_indices[tv_i])
@@ -173,7 +192,7 @@ class FireflyDataModule(pl.LightningDataModule):
                 valid_dataset.indices = valid_indices
                 np.random.shuffle(valid_dataset.indices)
                 test_dataset.indices = [idx for idx in set(range(len(dataset)))
-                                    if idx not in set(train_indices + valid_indices)]
+                                        if idx not in set(train_indices + valid_indices)]
                 np.random.shuffle(test_dataset.indices)
                 # train_dataset.indices = self.downsample_dataset(train_dataset)
                 # valid_dataset.indices = self.downsample_dataset(valid_dataset)
@@ -198,14 +217,16 @@ class FireflyDataModule(pl.LightningDataModule):
                         mi = min(included_dataset.iloc[train_index]['species_label'].value_counts())
                         k_i = int(ma / (mi * 0.8))
                         if k_i > 1:
-                            folds = sklearn.model_selection.KFold(n_splits=k_i, shuffle=True, random_state=self.gen_seed)
+                            folds = sklearn.model_selection.KFold(n_splits=k_i, shuffle=True,
+                                                                  random_state=self.gen_seed)
                             for j, (tr_i, t_i) in enumerate(folds.split(c_indices)):
                                 if i % k_i == j:
                                     train_indices.extend(c_indices[t_i])
                         else:
                             k_i = int(ma / (ma - 0.8 * mi))
                             if k_i > 1:
-                                folds = sklearn.model_selection.KFold(n_splits=k_i, shuffle=True, random_state=self.gen_seed)
+                                folds = sklearn.model_selection.KFold(n_splits=k_i, shuffle=True,
+                                                                      random_state=self.gen_seed)
                                 for j, (tr_i, t_i) in enumerate(folds.split(c_indices)):
                                     if i % k_i == j:
                                         train_indices.extend(c_indices[tr_i])
@@ -222,14 +243,16 @@ class FireflyDataModule(pl.LightningDataModule):
                         k_v = int(va / (vi * 0.8))
 
                         if k_v > 1:
-                            folds = sklearn.model_selection.KFold(n_splits=k_v, shuffle=True, random_state=self.gen_seed)
+                            folds = sklearn.model_selection.KFold(n_splits=k_v, shuffle=True,
+                                                                  random_state=self.gen_seed)
                             for jv, (tv_i, v_i) in enumerate(folds.split(v_indices)):
                                 if i % k_v == jv:
                                     valid_indices.extend(v_indices[v_i])
                         else:
                             k_v = int(ma / (ma - 0.8 * mi))
                             if k_v > 1:
-                                folds = sklearn.model_selection.KFold(n_splits=k_v, shuffle=True, random_state=self.gen_seed)
+                                folds = sklearn.model_selection.KFold(n_splits=k_v, shuffle=True,
+                                                                      random_state=self.gen_seed)
                                 for jv, (tv_i, v_i) in enumerate(folds.split(v_indices)):
                                     if i % k_v == jv:
                                         valid_indices.extend(v_indices[tv_i])
@@ -239,7 +262,8 @@ class FireflyDataModule(pl.LightningDataModule):
             # end cv
             # make subset objects
             train_dataset, valid_dataset, test_dataset = random_split(
-                dataset=dataset, lengths=[n_train, n_val, n_test], generator=torch.Generator().manual_seed(self.gen_seed)
+                dataset=dataset, lengths=[n_train, n_val, n_test],
+                generator=torch.Generator().manual_seed(self.gen_seed)
             )
 
             # override subset indices
@@ -255,8 +279,6 @@ class FireflyDataModule(pl.LightningDataModule):
                 print('done splitting data into {} train/{} validation/{} test sequences...'.format(len(train_dataset),
                                                                                                     len(valid_dataset),
                                                                                                     len(test_dataset)))
-        if self.flip:
-            return test_dataset, valid_dataset, train_dataset
         return train_dataset, valid_dataset, test_dataset
 
     def split_dataset_by_date(self, df):
@@ -266,12 +288,40 @@ class FireflyDataModule(pl.LightningDataModule):
             dates_to_exclude = self.date_to_exclude.split(',')
             exclude_df = df[df['Dataset'].isin(dates_to_exclude)]
             rest_df = df[~df['Dataset'].isin(dates_to_exclude)]
+            if self.dataset_ratio == '':
+                return exclude_df, rest_df
+            else:
+                ratios_of_dates = [float(x) for x in self.dataset_ratio.split(',')]
+                if sum(ratios_of_dates) != 1:
+                    raise AssertionError('Ratios of species must sum to 1!')
+                counts = exclude_df.value_counts()
+                total = min(counts)
+                pairs = []
+                for sp, ratio in zip(dates_to_exclude, ratios_of_dates):
+                    amount_of_species = (total * ratio)
+                    pairs.append((sp, int(amount_of_species)))
+                aggregated_df = pd.DataFrame(columns=['species', 'species_label', 'Dataset'])
+                for pair in pairs:
+                    # Select a random category
+                    selected_category = pair[0]
 
-            return exclude_df, rest_df
+                    # Filter the dataframe to include only the selected category
+                    selected_data = exclude_df[exclude_df['Dataset'] == selected_category]
+
+                    # Randomly sample from the selected category
+                    sampled_data = selected_data.sample(pair[1], random_state=self.gen_seed)
+                    unselected_data = selected_data.drop(sampled_data.index)
+                    rest_df = rest_df.append(unselected_data)
+
+                    # Append the sampled data to the aggregated dataframe
+                    aggregated_df = aggregated_df.append(sampled_data)
+
+                exclude_df = aggregated_df
+                return exclude_df, rest_df
 
 
 class RealFireflyData(FireflyDataModule):
     def __init__(self, data_dir, augmentations, class_limit, batch_size, val_split, gen_seed, downsample, data_path,
-                 flip, dataset_date):
+                 flip, dataset_date, dataset_ratio):
         super().__init__(data_dir, augmentations, class_limit, batch_size, val_split, gen_seed, downsample, data_path,
-                         flip, dataset_date)
+                         flip, dataset_date, dataset_ratio)

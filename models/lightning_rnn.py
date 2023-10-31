@@ -276,6 +276,8 @@ class LITGRU(pl.LightningModule):
                                help='Use imbalanced set as training instead of test')
         subparser.add_argument('--dataset_date', type=str, default='',
                                help='Exclude a date from training (to be tested on downstream)')
+        subparser.add_argument('--dataset_ratio', type=str, default='',
+                               help='Comma separated list of percentage values to mix the test set')
         subparser.set_defaults(load=False)
         subparser.set_defaults(enable_progress_bar=False)
         return subparser
@@ -433,7 +435,6 @@ class LITGRU(pl.LightningModule):
 
     @staticmethod
     def pca_cluster(hidden, y, ax):
-
         pca = PCA(n_components=3)
         pca_results = pca.fit_transform(hidden[1])
         d = dict()

@@ -51,7 +51,8 @@ class ModelRunner:
                                        downsample=pretrained_model.hparams.downsample,
                                        data_path=self.data_file,
                                        flip=False,
-                                       dataset_date=self.hparams.dataset_date
+                                       dataset_date=self.hparams.dataset_date,
+                                       dataset_ratio=self.hparams.dataset_ratio
                                        )
                 pretrained_models = [pretrained_model]
                 self.metrics.eval_metrics(pretrained_models, [data.test_dataloader()],
@@ -83,7 +84,8 @@ class ModelRunner:
                                                   downsample=pretrained_model.hparams.downsample,
                                                   data_path=self.data_file,
                                                   flip=self.hparams.flip,
-                                                  dataset_date=self.hparams.dataset_date
+                                                  dataset_date=self.hparams.dataset_date,
+                                                  dataset_ratio=self.hparams.dataset_ratio
                                                   )
                         _data = rf_data.test_dataloader()
                     pretrained_models.append(pretrained_model)
@@ -100,7 +102,8 @@ class ModelRunner:
                                      downsample=self.hparams.downsample,
                                      data_path=self.data_file,
                                      flip=self.hparams.flip,
-                                     dataset_date=self.hparams.dataset_date
+                                     dataset_date=self.hparams.dataset_date,
+                                     dataset_ratio=self.hparams.dataset_ratio
                                      )
 
             model = LITGRU(self.hparams)
