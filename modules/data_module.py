@@ -136,7 +136,7 @@ class FireflyDataModule(pl.LightningDataModule):
         if excluded_dataset is None:
             for i, (train_index, test_index) in enumerate(
                     strat_cv.split(dataset, dataset._meta_data.species_label.values)):
-                if i != self.gen_seed:
+                if i != self.gen_seed % k:
                     continue
                 else:
                     for c in range(self.class_limit):
@@ -283,7 +283,7 @@ class FireflyDataModule(pl.LightningDataModule):
 
     def split_dataset_by_date(self, df):
         if self.date_to_exclude == '':
-            return df, None
+            return None, df
         else:
             dates_to_exclude = self.date_to_exclude.split(',')
             exclude_df = df[df['Dataset'].isin(dates_to_exclude)]
