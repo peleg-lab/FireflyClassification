@@ -283,7 +283,7 @@ class FireflyDataModule(pl.LightningDataModule):
 
     def split_dataset_by_date(self, df):
         if self.date_to_exclude == '':
-            return None, df
+            return df, None
         else:
             dates_to_exclude = self.date_to_exclude.split(',')
             exclude_df = df[df['Dataset'].isin(dates_to_exclude)]
