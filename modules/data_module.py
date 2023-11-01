@@ -122,7 +122,7 @@ class FireflyDataModule(pl.LightningDataModule):
             dataset,
             n_train, n_val, n_test,
             downsample,
-            k=60
+            k=120
         )
         if self.flip:
             return test_dataset, valid_dataset, train_dataset
