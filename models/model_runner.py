@@ -23,19 +23,9 @@ class ModelRunner:
         self.rnn_checkpoint_path = "/ckpts/"
         self.rnn_log_path = "lightning_logs"
 
-        self.top_2 = False
-        self.run_cm = False
-        self.plot_clusters = False
-
-    def set_stat_bools(self, top_2=False, run_cm=False, plot_clusters=False):
-        self.top_2 = top_2
-        self.run_cm = run_cm
-        self.plot_clusters = plot_clusters
-
     def run_rnn(self):
         # runs the main training/val loop, etc...
         if self.hparams.resume_from != "none":
-            self.set_stat_bools(False, True, False)
             p = os.getcwd() + self.rnn_checkpoint_path + self.hparams.resume_from
             if "all" not in self.hparams.resume_from:
                 pretrained_model = LITGRU.load_from_checkpoint(p, map_location=lambda storage, loc: storage)
@@ -56,9 +46,10 @@ class ModelRunner:
                                        )
                 pretrained_models = [pretrained_model]
                 self.metrics.eval_metrics(pretrained_models, [data.test_dataloader()],
-                                          top_2=self.top_2,
-                                          run_cm=self.run_cm,
-                                          plot_clusters=self.plot_clusters)
+                                          top_2=self.hparams.top_2,
+                                          run_cm=self.hparams.run_cm,
+                                          plot_clusters=self.hparams.plot_clusters,
+                                          write_indices=self.hparams.write_indices)
             else:
                 pretrained_models = []
                 data = []
@@ -90,8 +81,11 @@ class ModelRunner:
                         _data = rf_data.test_dataloader()
                     pretrained_models.append(pretrained_model)
                     data.append(_data)
-                self.metrics.eval_metrics(pretrained_models, data, top_2=self.top_2, run_cm=self.run_cm,
-                                          plot_clusters=self.plot_clusters)
+                self.metrics.eval_metrics(pretrained_models, data,
+                                          top_2=self.hparams.top_2,
+                                          run_cm=self.hparams.run_cm,
+                                          plot_clusters=self.hparams.plot_clusters,
+                                          write_indices=self.hparams.write_indices)
         else:
             data = FireflyDataModule(data_dir='data',
                                      augmentations=self.augmentations,

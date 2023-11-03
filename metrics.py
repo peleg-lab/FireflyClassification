@@ -4,6 +4,7 @@ import io
 import numpy as np
 import seaborn as sns
 import pandas as pd
+from collections import Counter
 
 import matplotlib.pyplot as plt
 
@@ -41,16 +42,28 @@ class Metrics:
                 ret_arr = np.concatenate((ret_arr, sublist))
         return ret_arr
 
-    def eval_metrics(self, pretrained_models, data, top_2=False, run_cm=False, plot_clusters=False):
+    def eval_metrics(self, pretrained_models, data,
+                     top_2=False,
+                     run_cm=False,
+                     plot_clusters=False,
+                     write_indices=False):
         n_classes_model = pretrained_models[0].hparams.n_classes
         plot = True
         cm = None
         model_cms = []
+        cumulative_dict = {0: [],
+                           1: [],
+                           2: [],
+                           3: [],
+                           4: [],
+                           5: [],
+                           6: []}
         num_runs = len(pretrained_models)
         if run_cm:
             for model, d in zip(pretrained_models, data):
                 model_cm = model.eval_real_data(d, model.hparams.n_classes,
-                                                save=False, return_cm=True, top_2=top_2, plot_clusters=plot_clusters)
+                                                save=False, return_cm=True, top_2=top_2, plot_clusters=plot_clusters,
+                                                cumulative_dict=cumulative_dict)
                 if cm is None:
                     cm = model_cm
                     model_cms.append(model_cm)
@@ -59,6 +72,28 @@ class Metrics:
                         for j in range(n_classes_model):
                             cm[i, j] += model_cm[i, j]
                     model_cms.append(model_cm)
+
+            top_indices = {i: [] for i in cumulative_dict.keys()}
+            for k in cumulative_dict.keys():
+                indices_sorted_by_occurrence = sorted(cumulative_dict[k],
+                                                      key=Counter(cumulative_dict[k]).get,
+                                                      reverse=True)
+                top_indices[k].extend(list(set(indices_sorted_by_occurrence))[:100])
+
+            if write_indices:
+                with open('sorted_indices.txt', 'w') as f:
+                    for k in top_indices.keys():
+                        f.write('{{ {}: '.format(k))
+                        for i,v in enumerate(top_indices[k]):
+                            if i != len(top_indices[k]):
+                                f.write("{},".format(v))
+                            else:
+                                f.write("{}".format(v))
+                        if k < max(top_indices.keys()):
+                            f.write("},\n")
+                        else:
+                            f.write("}}")
+
             cm = cm / len(pretrained_models)
             self.plot_cm(cm, model_cms, n_classes_model, num_runs, top_2=top_2)
 

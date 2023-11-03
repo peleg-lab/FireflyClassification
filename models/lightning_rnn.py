@@ -6,6 +6,7 @@ import pytorch_lightning as pl
 from os.path import exists
 
 from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -260,6 +261,14 @@ class LITGRU(pl.LightningModule):
                                help='Path to data dir')
         subparser.add_argument('--data_file', type=str,
                                help='Data file name')
+        subparser.add_argument('--top_2', default=False, type=bool,
+                               help='Whether to operate in top 2 paradigm')
+        subparser.add_argument('--run_cm', default=True, type=bool,
+                               help='Whether to plot and analyze confusion matrices')
+        subparser.add_argument('--plot_clusters', default=False, type=bool,
+                               help='Whether to plot TSNE clusters')
+        subparser.add_argument('--write_indices', default=False, type=bool,
+                               help='Whether to write indices of top performing sequences')
 
         subparser.add_argument('--load', action='store_true', help='Enable loading from saved dataloaders')
 
@@ -317,7 +326,8 @@ class LITGRU(pl.LightningModule):
 
         return y_pred, y_true
 
-    def eval_real_data(self, test_dataloader, n_classes, save=True, return_cm=False, top_2=False, plot_clusters=False):
+    def eval_real_data(self, test_dataloader, n_classes, save=True, return_cm=False, top_2=False, plot_clusters=False,
+                       cumulative_dict=None):
         y_pred = []
         y_true = []
         topx = 2
@@ -346,7 +356,8 @@ class LITGRU(pl.LightningModule):
                 batch_output, hidden = self.forward(padded[0].to(self.device))
                 # compute loss
                 if plot_clusters:
-                    self.pca_cluster(hidden, y, ax)
+                    #self.pca_cluster(hidden, y, ax)
+                    self.tsne_cluster(hidden, y, ax)
                 output_logits = batch_output.permute(1, 0, 2)
                 final_logit = output_logits[-1]
                 softmax_vals = nn.Softmax(dim=1)(final_logit)
@@ -361,6 +372,10 @@ class LITGRU(pl.LightningModule):
                 y_true.extend(list(y.cpu().detach().numpy()))
                 y_pred_topx.extend(list([x[:topx] for x in (-softmax_vals).argsort()]))
 
+        for k in softmax_indices_for_each_class.keys():
+            sorted_vals = sorted(softmax_indices_for_each_class[k], key=lambda x: x[1], reverse=True)[:100]
+            top_indices = [i for i, j in sorted_vals]
+            cumulative_dict[k].extend(top_indices)
         if plot_clusters:
             ax.set_facecolor('white')
             plt.savefig('figs/pca_3d{}.eps'.format(self.hparams['version']), dpi=600, facecolor='white')
@@ -433,7 +448,7 @@ class LITGRU(pl.LightningModule):
                                                                  f1_score(y_true, y_pred, average='weighted')))
         else:
             return cm
-        print('done')
+        print('done evaluating acc')
 
     @staticmethod
     def pca_cluster(hidden, y, ax):
@@ -446,17 +461,27 @@ class LITGRU(pl.LightningModule):
         d['y'] = y
         df = pd.DataFrame(d)
         colors = {0: 'dodgerblue', 1: 'cyan', 2: 'mediumorchid', 3: 'maroon',
-                    4: 'olivedrab', 5: 'orange', 6: 'midnightblue'}
+                  4: 'olivedrab', 5: 'orange', 6: 'midnightblue'}
 
         for s in df.y.unique():
-            # if s == 0:
-            #     mask = (df['y'] == s) & (df['pca-two'] > 5)
-            # elif s == 1:
-            #     mask = (df['y'] == s) & (df['pca-one'] < 0)
-            # elif s == 2:
-            #     mask = (df['y'] == s) & (df['pca-one'] > 0)
-            # else:
             mask = (df['y'] == s)
 
             ax.scatter(df['pca-one'][mask], df['pca-two'][mask], df['pca-three'][mask], color=colors[s],
                        alpha=0.8)
+
+    @staticmethod
+    def tsne_cluster(hidden, y, ax):
+        pca = TSNE(n_components=2)
+        pca_results = pca.fit_transform(hidden[1])
+        d = dict()
+        d['tsne-one'] = pca_results[:, 0]
+        d['tsne-two'] = pca_results[:, 1]
+        d['y'] = y
+        df = pd.DataFrame(d)
+        colors = {0: 'dodgerblue', 1: 'cyan', 2: 'mediumorchid', 3: 'maroon',
+                  4: 'olivedrab', 5: 'orange', 6: 'midnightblue'}
+
+        for s in df.y.unique():
+            mask = (df['y'] == s)
+
+            ax.scatter(df['tsne-one'][mask], df['tsne-two'][mask], color=colors[s])
