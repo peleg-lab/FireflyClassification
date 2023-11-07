@@ -18,7 +18,7 @@ class ModelRunner:
         self.data_dir = self.hparams.data_dir
         self.dataloaders_dir = self.hparams.dataloaders_dir
         self.data_file = self.hparams.data_file or 'flash_sequence_data.csv'
-        self.metrics = Metrics()
+        self.metrics = Metrics(hparams)
 
         self.rnn_checkpoint_path = "/ckpts/"
         self.rnn_log_path = "lightning_logs"

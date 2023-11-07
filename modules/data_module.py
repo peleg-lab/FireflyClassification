@@ -206,70 +206,68 @@ class FireflyDataModule(pl.LightningDataModule):
                 test_dataset.indices = [idx for idx in set(range(len(dataset)))
                                         if idx not in set(train_indices + valid_indices)]
                 np.random.shuffle(test_dataset.indices)
-                # train_dataset.indices = self.downsample_dataset(train_dataset)
-                # valid_dataset.indices = self.downsample_dataset(valid_dataset)
-                # test_dataset.indices = self.downsample_dataset(test_dataset)
                 print('done splitting data into {} train/{} validation/{} test sequences...'.format(
                     len(train_dataset),
                     len(valid_dataset),
                     len(test_dataset)))
         else:
-            for i, (train_index, test_index) in enumerate(
-                    strat_cv.split(included_dataset, included_dataset.species_label.values)):
-                if i != self.gen_seed:
-                    continue
-                else:
-                    for c in range(self.class_limit):
-                        c_indices = train_index[np.where(included_dataset.iloc[train_index]['species_label'] == c)]
-                        set1 = set(c_indices)
-                        set2 = set(excluded_dataset.index.tolist())
+            if self.dataset_ratio == '':
+                for i, (train_index, test_index) in enumerate(
+                        strat_cv.split(included_dataset, included_dataset.species_label.values)):
+                    if i != self.gen_seed % k:
+                        continue
+                    else:
+                        for c in range(self.class_limit):
+                            c_indices = train_index[np.where(included_dataset.iloc[train_index]['species_label'] == c)]
+                            set1 = set(c_indices)
+                            set2 = set(excluded_dataset.index.tolist())
 
-                        c_indices = np.array(list(set1.difference(set2)))
-                        ma = len(c_indices)
-                        mi = min(included_dataset.iloc[train_index]['species_label'].value_counts())
-                        k_i = int(ma / (mi * 0.8))
-                        if k_i > 1:
-                            folds = sklearn.model_selection.KFold(n_splits=k_i, shuffle=True,
-                                                                  random_state=self.gen_seed)
-                            for j, (tr_i, t_i) in enumerate(folds.split(c_indices)):
-                                if i % k_i == j:
-                                    train_indices.extend(c_indices[t_i])
-                        else:
-                            k_i = int(ma / (ma - 0.8 * mi))
+                            c_indices = np.array(list(set1.difference(set2)))
+                            ma = len(c_indices)
+                            mi = min(included_dataset.iloc[train_index]['species_label'].value_counts())
+                            k_i = int(ma / (mi * 0.8))
                             if k_i > 1:
                                 folds = sklearn.model_selection.KFold(n_splits=k_i, shuffle=True,
                                                                       random_state=self.gen_seed)
                                 for j, (tr_i, t_i) in enumerate(folds.split(c_indices)):
                                     if i % k_i == j:
-                                        train_indices.extend(c_indices[tr_i])
+                                        train_indices.extend(c_indices[t_i])
                             else:
-                                train_indices.extend(c_indices)
+                                k_i = int(ma / (ma - 0.8 * mi))
+                                if k_i > 1:
+                                    folds = sklearn.model_selection.KFold(n_splits=k_i, shuffle=True,
+                                                                          random_state=self.gen_seed)
+                                    for j, (tr_i, t_i) in enumerate(folds.split(c_indices)):
+                                        if i % k_i == j:
+                                            train_indices.extend(c_indices[tr_i])
+                                else:
+                                    train_indices.extend(c_indices)
 
-                        v_indices = test_index[np.where(included_dataset.iloc[test_index]['species_label'] == c)]
-                        set1 = set(v_indices)
-                        set2 = set(excluded_dataset.index.tolist())
+                            v_indices = test_index[np.where(included_dataset.iloc[test_index]['species_label'] == c)]
+                            set1 = set(v_indices)
+                            set2 = set(excluded_dataset.index.tolist())
 
-                        v_indices = np.array(list(set1.difference(set2)))
-                        va = len(v_indices)
-                        vi = min(included_dataset.iloc[test_index]['species_label'].value_counts())
-                        k_v = int(va / (vi * 0.8))
+                            v_indices = np.array(list(set1.difference(set2)))
+                            va = len(v_indices)
+                            vi = min(included_dataset.iloc[test_index]['species_label'].value_counts())
+                            k_v = int(va / (vi * 0.8))
 
-                        if k_v > 1:
-                            folds = sklearn.model_selection.KFold(n_splits=k_v, shuffle=True,
-                                                                  random_state=self.gen_seed)
-                            for jv, (tv_i, v_i) in enumerate(folds.split(v_indices)):
-                                if i % k_v == jv:
-                                    valid_indices.extend(v_indices[v_i])
-                        else:
-                            k_v = int(ma / (ma - 0.8 * mi))
                             if k_v > 1:
                                 folds = sklearn.model_selection.KFold(n_splits=k_v, shuffle=True,
                                                                       random_state=self.gen_seed)
                                 for jv, (tv_i, v_i) in enumerate(folds.split(v_indices)):
                                     if i % k_v == jv:
-                                        valid_indices.extend(v_indices[tv_i])
+                                        valid_indices.extend(v_indices[v_i])
                             else:
-                                valid_indices.extend(v_indices)
+                                k_v = int(ma / (ma - 0.8 * mi))
+                                if k_v > 1:
+                                    folds = sklearn.model_selection.KFold(n_splits=k_v, shuffle=True,
+                                                                          random_state=self.gen_seed)
+                                    for jv, (tv_i, v_i) in enumerate(folds.split(v_indices)):
+                                        if i % k_v == jv:
+                                            valid_indices.extend(v_indices[tv_i])
+                                else:
+                                    valid_indices.extend(v_indices)
 
             # end cv
             # make subset objects
@@ -304,7 +302,7 @@ class FireflyDataModule(pl.LightningDataModule):
                 return exclude_df, rest_df
             else:
                 ratios_of_dates = [float(x) for x in self.dataset_ratio.split(',')]
-                if sum(ratios_of_dates) != 1:
+                if round(sum(ratios_of_dates), 5) != 1:
                     raise AssertionError('Ratios of species must sum to 1!')
                 counts = exclude_df.value_counts()
                 total = min(counts)
@@ -314,14 +312,13 @@ class FireflyDataModule(pl.LightningDataModule):
                     pairs.append((sp, int(amount_of_species)))
                 aggregated_df = pd.DataFrame(columns=['species', 'species_label', 'Dataset'])
                 for pair in pairs:
-                    # Select a random category
                     selected_category = pair[0]
 
                     # Filter the dataframe to include only the selected category
                     selected_data = exclude_df[exclude_df['Dataset'] == selected_category]
 
                     # Randomly sample from the selected category
-                    sampled_data = selected_data.sample(pair[1], random_state=self.gen_seed)
+                    sampled_data = selected_data.sample(pair[1], random_state=self.gen_seed))
                     unselected_data = selected_data.drop(sampled_data.index)
                     rest_df = rest_df.append(unselected_data)
 

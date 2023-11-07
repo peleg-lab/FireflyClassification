@@ -28,10 +28,11 @@ class CPU_Unpickler(pickle.Unpickler):
 
 
 class Metrics:
-    def __init__(self):
+    def __init__(self, hparams):
         self.CPU_Unpickler = CPU_Unpickler
         self.rnn_logs = "./lightning_logs/"
         self.fig_path = './figs'
+        self.hparams = hparams
 
     @staticmethod
     def gather(arr, idx):
@@ -48,7 +49,7 @@ class Metrics:
                      plot_clusters=False,
                      write_indices=False):
         n_classes_model = pretrained_models[0].hparams.n_classes
-        plot = True
+        plot = False
         cm = None
         model_cms = []
         cumulative_dict = {0: [],
@@ -73,12 +74,11 @@ class Metrics:
                             cm[i, j] += model_cm[i, j]
                     model_cms.append(model_cm)
 
-            top_indices = {i: [] for i in cumulative_dict.keys()}
-            for k in cumulative_dict.keys():
-                indices_sorted_by_occurrence = sorted(cumulative_dict[k],
-                                                      key=Counter(cumulative_dict[k]).get,
-                                                      reverse=True)
-                top_indices[k].extend(list(set(indices_sorted_by_occurrence))[:100])
+            if write_indices:
+                top_indices = {i: None for i in cumulative_dict.keys()}
+                for k in cumulative_dict.keys():
+                    sorted_vals = sorted(cumulative_dict[k], key=lambda x: x[1], reverse=True)
+                    top_indices[k] = sorted_vals
 
             if write_indices:
                 with open('sorted_indices.txt', 'w') as f:
@@ -86,16 +86,24 @@ class Metrics:
                         f.write('{{ {}: '.format(k))
                         for i,v in enumerate(top_indices[k]):
                             if i != len(top_indices[k]):
-                                f.write("{},".format(v))
+                                f.write("{},".format(v[0]))
                             else:
-                                f.write("{}".format(v))
+                                f.write("{}".format(v[0]))
                         if k < max(top_indices.keys()):
                             f.write("},\n")
                         else:
                             f.write("}}")
 
             cm = cm / len(pretrained_models)
-            self.plot_cm(cm, model_cms, n_classes_model, num_runs, top_2=top_2)
+            if plot:
+                self.plot_cm(cm, model_cms, n_classes_model, num_runs, top_2=top_2)
+            else:
+                if self.hparams.dataset_date != '':
+                    np.savetxt('{}classes_{}days_{}ratio_confusion_matrix.txt'.format(
+                        n_classes_model,
+                        self.hparams.dataset_date,
+                        self.hparams.dataset_ratio),
+                        cm)
 
         y_tests = []
         y_preds = []
