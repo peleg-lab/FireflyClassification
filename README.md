@@ -49,3 +49,17 @@ trainer = Trainer()
 trainer.fit(model, train, val)
 
 ```
+
+## Data
+The full data csv is housed in data/real_data/flash_sequence_data.csv. The units for the columns are as follows:
+Dataset, species, species_label = string, no units
+
+start_time = Hours:Minutes
+
+start_temp_F = Degrees Fahrenheit
+
+Num_flashes = unitless integer
+
+Flash_duration, ifi = seconds
+
+Timeseries = each point is a frame at 30 frames per second
