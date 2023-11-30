@@ -318,7 +318,8 @@ class FireflyDataModule(pl.LightningDataModule):
                     selected_data = exclude_df[exclude_df['Dataset'] == selected_category]
 
                     # Randomly sample from the selected category
-                    sampled_data = selected_data.sample(pair[1], random_state=self.gen_seed)
+                    np.random.seed()
+                    sampled_data = selected_data.sample(pair[1])
                     unselected_data = selected_data.drop(sampled_data.index)
                     rest_df = rest_df.append(unselected_data)
 

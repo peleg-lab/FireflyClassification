@@ -47,9 +47,12 @@ class Metrics:
                      top_2=False,
                      run_cm=False,
                      plot_clusters=False,
-                     write_indices=False):
+                     write_indices=False,
+                     return_stats=False):
         n_classes_model = pretrained_models[0].hparams.n_classes
-        plot = False
+        plot = True
+        run_cm = True
+        write_indices = False
         cm = None
         model_cms = []
         cumulative_dict = {0: [],
@@ -95,6 +98,8 @@ class Metrics:
                             f.write("}}")
 
             cm = cm / len(pretrained_models)
+            if return_stats:
+                return cm
             if plot:
                 self.plot_cm(cm, model_cms, n_classes_model, num_runs, top_2=top_2)
             else:
@@ -128,6 +133,7 @@ class Metrics:
             y_test = lb.transform(y_true)
             y_tests.append(y_test.reshape(np.array(y_pred).shape))
             y_preds.append(np.array(y_pred))
+
         if plot:
             self.plot_roc_curve(n_classes_model, y_tests, y_preds)
             self.plot_pre_rec_curve(n_classes_model, y_tests, y_preds)
@@ -146,6 +152,7 @@ class Metrics:
             print('f1 for class {}: {}'.format(c_label, np.mean(class_f1s[c_label])))
             print('f1 std for class {}: {}'.format(c_label, np.std(class_f1s[c_label])))
         print(all_reports)
+        print('done with metrics')
 
     def timeseries_and_cm(self, path, cnn=True):
         if cnn:
@@ -176,15 +183,19 @@ class Metrics:
         colormap = {0: 'dodgerblue', 1: 'cyan', 2: 'mediumorchid', 3: 'maroon',
                     4: 'olivedrab', 5: 'orange', 6: 'midnightblue'}
         fig, ax = plt.subplots()
+        to_save = dict.fromkeys([0, 1, 2, 3, 4, 5, 6])
         for (idx, c_label) in enumerate(range(n_classes_model)):
             y_true = self.gather(y_trues, idx)
             y_pred = self.gather(y_preds, idx)
             fpr, tpr, thresholds = roc_curve(y_true, y_pred)
+            to_save[c_label] = {'tpr': tpr,
+                                'fpr': fpr}
             ax.plot(fpr, tpr,
                     label='{}'.format(names.name_dict['all_names'][idx]),
                     color=colormap[idx],
                     lw=2,
                     )
+
         ax.plot([0, 1], [0, 1], color="dimgray", lw=2, linestyle="--")
         ax.set_xlim([0.0, 1.0])
         ax.set_ylim([0.0, 1.05])
@@ -194,6 +205,9 @@ class Metrics:
 
         plt.tight_layout()
         plt.savefig(self.fig_path + '/roc_curves.png')
+        df_to_save = pd.DataFrame(to_save)
+        with open('roc_curve_vals_7_updated.csv', 'w') as f:
+            df_to_save.to_csv(f)
 
     def report_auroc(self, n_classes_model, y_trues, y_preds):
         for (idx, c_label) in enumerate(range(n_classes_model)):
@@ -238,6 +252,8 @@ class Metrics:
             print('Class {}: AuPRC {} vs. baseline {}'.format(c_label, auprc, no_skill))
 
     def plot_cm(self, cm, model_cms, n_classes_model, num_runs, top_2=False):
+        for line in cm:
+            print(line)
         acc = round(np.trace(cm) / cm.sum(), 4)
         true_pos = np.diag(cm)
         false_pos = np.sum(cm, axis=0) - true_pos

@@ -23,7 +23,7 @@ class ModelRunner:
         self.rnn_checkpoint_path = "/ckpts/"
         self.rnn_log_path = "lightning_logs"
 
-    def run_rnn(self):
+    def run_rnn(self, return_stats=False):
         # runs the main training/val loop, etc...
         if self.hparams.resume_from != "none":
             p = os.getcwd() + self.rnn_checkpoint_path + self.hparams.resume_from
@@ -45,11 +45,21 @@ class ModelRunner:
                                        dataset_ratio=self.hparams.dataset_ratio
                                        )
                 pretrained_models = [pretrained_model]
-                self.metrics.eval_metrics(pretrained_models, [data.test_dataloader()],
-                                          top_2=self.hparams.top_2,
-                                          run_cm=self.hparams.run_cm,
-                                          plot_clusters=self.hparams.plot_clusters,
-                                          write_indices=self.hparams.write_indices)
+                if return_stats:
+                    cm = self.metrics.eval_metrics(pretrained_models, [data.test_dataloader()],
+                                                   top_2=self.hparams.top_2,
+                                                   run_cm=self.hparams.run_cm,
+                                                   plot_clusters=self.hparams.plot_clusters,
+                                                   write_indices=self.hparams.write_indices,
+                                                   return_stats=return_stats)
+                    return cm, data.test_dataloader().dataset.indices
+                else:
+                    self.metrics.eval_metrics(pretrained_models, [data.test_dataloader()],
+                                              top_2=self.hparams.top_2,
+                                              run_cm=self.hparams.run_cm,
+                                              plot_clusters=self.hparams.plot_clusters,
+                                              write_indices=self.hparams.write_indices,
+                                              return_stats=return_stats)
             else:
                 pretrained_models = []
                 data = []

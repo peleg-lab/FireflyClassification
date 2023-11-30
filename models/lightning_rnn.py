@@ -372,11 +372,10 @@ class LITGRU(pl.LightningModule):
                 y_true.extend(list(y.cpu().detach().numpy()))
                 y_pred_topx.extend(list([x[:topx] for x in (-softmax_vals).argsort()]))
 
-        if self.hparams['write_indices']:
-            for k in softmax_indices_for_each_class.keys():
-                sorted_vals = sorted(softmax_indices_for_each_class[k], key=lambda x: x[1], reverse=True)
-                top_indices = [(i, j) for i, j in sorted_vals]
-                cumulative_dict[k].extend(top_indices)
+        # for k in softmax_indices_for_each_class.keys():
+        #     sorted_vals = sorted(softmax_indices_for_each_class[k], key=lambda x: x[1], reverse=True)
+        #     top_indices = [(i, j) for i, j in sorted_vals]
+        #     cumulative_dict[k].extend(top_indices)
         if plot_clusters:
             ax.set_facecolor('white')
             plt.savefig('figs/pca_3d{}.eps'.format(self.hparams['version']), dpi=600, facecolor='white')
