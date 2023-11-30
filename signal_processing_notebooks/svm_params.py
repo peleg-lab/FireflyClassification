@@ -36,7 +36,7 @@ def svmLit(df, params_lit, random_seed: int = None):
     """
 
     nf_labels = ['nf', 'num_flashes', 'num_flash', 'numflashes', 'numflash']
-    fl_labels = ['fl', 'flash_length', 'flashlength', 'flash']
+    fl_labels = ['fl', 'flash_length', 'flashlength', 'flash', 'flash_duration', 'fd', 'flashduration']
     gap_labels = ['gl', 'gap_length', 'gap', 'ifi', 'ipi']
 
     if not any(label in nf_labels for label in list(df.columns)):
@@ -86,9 +86,11 @@ def svmLit(df, params_lit, random_seed: int = None):
     acc = metrics['accuracy']
     prec = metrics['macro avg']['precision']
     rec = metrics['macro avg']['recall']
+    prec_weighted = metrics['weighted avg']['precision']
+    rec_weighted = metrics['weighted avg']['recall']
 
     y_score = np.stack(y_score,axis=0)
-    return acc, prec, rec, conf_mat, y_test, rbf_pred, y_score, metrics
+    return acc, prec, rec, prec_weighted, rec_weighted, conf_mat, y_test, rbf_pred, y_score, metrics
 
 def svmPop(df, k, train_split, random_seed: int = None):
     """
@@ -121,7 +123,7 @@ def svmPop(df, k, train_split, random_seed: int = None):
     """
 
     nf_labels = ['nf', 'num_flashes', 'num_flash', 'numflashes', 'numflash']
-    fl_labels = ['fl', 'flash_length', 'flashlength', 'flash']
+    fl_labels = ['fl', 'flash_length', 'flashlength', 'flash', 'flash_duration', 'fd', 'flashduration']
     gap_labels = ['gl', 'gap_length', 'gap', 'ifi', 'ipi']
 
     if not any(label in nf_labels for label in list(df.columns)):
@@ -142,6 +144,8 @@ def svmPop(df, k, train_split, random_seed: int = None):
     accs = []
     precs = []
     recs = []
+    precs_weighted = []
+    recs_weighted = []
     conf_mat = np.zeros((num_species,num_species))
     y_trues = []
     y_preds = []
@@ -200,9 +204,15 @@ def svmPop(df, k, train_split, random_seed: int = None):
         acc = metrics['accuracy']
         prec = metrics['macro avg']['precision']
         rec = metrics['macro avg']['recall']
+        prec_weighted = metrics['weighted avg']['precision']
+        rec_weighted = metrics['weighted avg']['recall']
+        
         accs.append(acc)
         precs.append(prec)
         recs.append(rec)
+        precs_weighted.append(prec_weighted)
+        recs_weighted.append(rec_weighted)
+        
         y_trues.append(y_test)
         y_preds.append(rbf_pred)
         y_scores.append(y_score)
@@ -210,4 +220,4 @@ def svmPop(df, k, train_split, random_seed: int = None):
             precs_sp[sp,iter] = metrics[str(sp)]['precision']
             recs_sp[sp,iter] = metrics[str(sp)]['recall']
 
-    return accs, precs, recs, conf_mat/k, [i for j in y_trues for i in j], [i for j in y_preds for i in j], np.vstack(y_scores), precs_sp, recs_sp
+    return accs, precs, recs, precs_weighted, recs_weighted, conf_mat/k, [i for j in y_trues for i in j], [i for j in y_preds for i in j], np.vstack(y_scores), precs_sp, recs_sp

@@ -6,7 +6,7 @@
 % !!! Before running, make sure dtw_c.m function is in path !!!
 
 %% Load data
-data = readtable('../data/real_data/flash_pattern_data.csv');
+data = readtable('../data/real_data/flash_sequence_data.csv');
 % Unpack timeseries
 timeseries = data.timeseries;
 for i = 1:size(timeseries,1)
@@ -18,7 +18,7 @@ for i = 1:size(timeseries,1)
 end
 
 labels = data.species_label;
-params = data{:,{'num_flashes','flash_length','ifi'}};
+params = data{:,{'num_flashes','flash_duration','ifi'}};
 % Exclude sequences with only 1 flash
 seqs(params(:,1)<=1,:) = [];
 labels(params(:,1)<=1,:) = [];

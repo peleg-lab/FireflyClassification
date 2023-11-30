@@ -57,7 +57,7 @@ def dtwLit(df, literature_sequences, literature_labels, random_seed: int = None)
                 seq = curr_spec_test[i][:np.where(np.isnan(curr_spec_test[i]))[0][0]]
             dtws = []
             for j in range(len(literature_sequences)):
-                distance, path = fastdtw(seq, literature_sequences[j], dist=euclidean)
+                distance, path = fastdtw(seq, np.array(literature_sequences[j]), dist=euclidean)
                 dtws.append(distance)
             score = softmax(np.multiply(dtws,-1))
             if np.all(np.isclose(score, score[0])):
@@ -82,5 +82,7 @@ def dtwLit(df, literature_sequences, literature_labels, random_seed: int = None)
     acc = metrics['accuracy']
     prec = metrics['macro avg']['precision']
     rec = metrics['macro avg']['recall']
+    prec_weighted = metrics['weighted avg']['precision']
+    rec_weighted = metrics['weighted avg']['recall']
 
-    return acc, prec, rec, conf_mat, y_true, y_pred, np.stack(y_score,axis=0), metrics
+    return acc, prec, rec, prec_weighted, rec_weighted, conf_mat, y_true, y_pred, np.stack(y_score,axis=0), metrics

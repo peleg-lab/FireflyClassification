@@ -79,8 +79,10 @@ def dotProductLit(df, literature_sequences, literature_labels, random_seed: int 
     acc = metrics['accuracy']
     prec = metrics['macro avg']['precision']
     rec = metrics['macro avg']['recall']
-
-    return acc, prec, rec, conf_mat, y_true, y_pred, np.stack(y_score,axis=0), metrics
+    prec_weighted = metrics['weighted avg']['precision']
+    rec_weighted = metrics['weighted avg']['recall']
+    
+    return acc, prec, rec, prec_weighted, rec_weighted, conf_mat, y_true, y_pred, np.stack(y_score,axis=0), metrics
 
 
 def dotProductPop(df, k, train_split, random_seed: int = None):
@@ -123,6 +125,8 @@ def dotProductPop(df, k, train_split, random_seed: int = None):
     accs = []
     precs = []
     recs = []
+    precs_weighted = []
+    recs_weighted = []
     conf_mat = np.zeros((num_species,num_species))
     y_trues = []
     y_preds = []
@@ -206,9 +210,15 @@ def dotProductPop(df, k, train_split, random_seed: int = None):
         acc = metrics['accuracy']
         prec = metrics['macro avg']['precision']
         rec = metrics['macro avg']['recall']
+        prec_weighted = metrics['weighted avg']['precision']
+        rec_weighted = metrics['weighted avg']['recall']
+        
         accs.append(acc)
         precs.append(prec)
         recs.append(rec)
+        precs_weighted.append(prec_weighted)
+        recs_weighted.append(rec_weighted)
+        
         y_trues.append(y_true)
         y_preds.append(y_pred)
         y_scores.append(y_score)
@@ -216,4 +226,4 @@ def dotProductPop(df, k, train_split, random_seed: int = None):
             precs_sp[sp,iter] = metrics[str(sp)]['precision']
             recs_sp[sp,iter] = metrics[str(sp)]['recall']
 
-    return accs, precs, recs, conf_mat/k, [i for j in y_trues for i in j], [i for j in y_preds for i in j], np.vstack(y_scores), precs_sp, recs_sp
+    return accs, precs, recs, precs_weighted, recs_weighted, conf_mat/k, [i for j in y_trues for i in j], [i for j in y_preds for i in j], np.vstack(y_scores), precs_sp, recs_sp
