@@ -48,25 +48,30 @@ class Metrics:
                      run_cm=False,
                      plot_clusters=False,
                      write_indices=False,
-                     return_stats=False):
+                     return_stats=False,
+                     track_indices=False):
         n_classes_model = pretrained_models[0].hparams.n_classes
         plot = True
-        run_cm = True
-        write_indices = False
         cm = None
         model_cms = []
-        cumulative_dict = {0: [],
-                           1: [],
-                           2: [],
-                           3: [],
-                           4: [],
-                           5: [],
-                           6: []}
+        if track_indices:
+            cumulative_dict = {0: [],
+                               1: [],
+                               2: [],
+                               3: [],
+                               4: [],
+                               5: [],
+                               6: []}
+        else:
+            cumulative_dict = None
         num_runs = len(pretrained_models)
         if run_cm:
             for model, d in zip(pretrained_models, data):
                 model_cm = model.eval_real_data(d, model.hparams.n_classes,
-                                                save=False, return_cm=True, top_2=top_2, plot_clusters=plot_clusters,
+                                                save=False,
+                                                return_cm=True,
+                                                top_2=top_2,
+                                                plot_clusters=plot_clusters,
                                                 cumulative_dict=cumulative_dict)
                 if cm is None:
                     cm = model_cm
@@ -83,7 +88,6 @@ class Metrics:
                     sorted_vals = sorted(cumulative_dict[k], key=lambda x: x[1], reverse=True)
                     top_indices[k] = sorted_vals
 
-            if write_indices:
                 with open('sorted_indices.txt', 'w') as f:
                     for k in top_indices.keys():
                         f.write('{{ {}: '.format(k))

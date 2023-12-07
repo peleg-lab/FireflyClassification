@@ -21,11 +21,7 @@ def get_retval(cm, sp):
                     'ik': 5,
                     'io': 6}
     species_val = species_dict[sp_short]
-    if cm[species_val, species_val] >= 0.5:
-        retval = (sp_short, 1)
-    else:
-        retval = (sp_short, 0)
-    return retval
+    return cm[species_val, species_val]
 
 
 def parse_cm(cm, species_pair):
@@ -332,6 +328,7 @@ if __name__ == "__main__":
         ('s0524uf,s2624bw,s1809ik,s0613ic,s1602io', '0.0,0.0,0.04,0.96,0.0'),
         ('s0524uf,s2624bw,s1809ik,s0613ic,s1602io', '0.0,0.0,0.03,0.97,0.0'),
         ('s0524uf,s2624bw,s1809ik,s0613ic,s1602io', '0.0,0.0,0.02,0.98,0.0'),
+        ('s0524uf,s2624bw,s1809ik,s0613ic,s1602io', '0.0,0.0,0.01,0.99,0.0'),
         ('s0524uf,s2624bw,s1809ik,s0613ic,s1602io', '0.0,0.0,0.005,0.995,0.0'),
         # ik, io
         ('s0524uf,s2624bw,s1809ik,s0613ic,s1602io', '0.0,0.0,0.995,0.0,0.005'),

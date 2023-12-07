@@ -433,12 +433,13 @@ if __name__ == "__main__":
         ('s0524uf,s2624bw,s1809ik,s0613ic,s1602io', '0.0,0.0,0.0,0.01,0.99'),
         ('s0524uf,s2624bw,s1809ik,s0613ic,s1602io', '0.0,0.0,0.0,0.005,0.995'),
     ]
+    n_processes = 500
     for (dataset_date, dataset_ratio) in test_matrix:
         hyperparams.dataset_ratio = dataset_ratio
         hyperparams.dataset_date = dataset_date
         model_runner = ModelRunner(hyperparams)
         procs = []
-        for i in range(8):
+        for i in range(n_processes):
             proc = Process(target=run_model, args=(model_runner, dataset_date, dataset_ratio, results_dict, manager))
             procs.append(proc)
             proc.start()

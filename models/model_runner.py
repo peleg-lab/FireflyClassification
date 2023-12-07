@@ -27,6 +27,8 @@ class ModelRunner:
         # runs the main training/val loop, etc...
         if self.hparams.resume_from != "none":
             p = os.getcwd() + self.rnn_checkpoint_path + self.hparams.resume_from
+
+            # one model
             if "all" not in self.hparams.resume_from:
                 pretrained_model = LITGRU.load_from_checkpoint(p, map_location=lambda storage, loc: storage)
 
@@ -51,7 +53,8 @@ class ModelRunner:
                                                    run_cm=self.hparams.run_cm,
                                                    plot_clusters=self.hparams.plot_clusters,
                                                    write_indices=self.hparams.write_indices,
-                                                   return_stats=return_stats)
+                                                   return_stats=return_stats,
+                                                   track_indices=self.hparams.track_indices)
                     return cm, data.test_dataloader().dataset.indices
                 else:
                     self.metrics.eval_metrics(pretrained_models, [data.test_dataloader()],
@@ -59,7 +62,10 @@ class ModelRunner:
                                               run_cm=self.hparams.run_cm,
                                               plot_clusters=self.hparams.plot_clusters,
                                               write_indices=self.hparams.write_indices,
-                                              return_stats=return_stats)
+                                              return_stats=return_stats,
+                                              track_indices=self.hparams.track_indices)
+
+            # ensemble of models
             else:
                 pretrained_models = []
                 data = []
@@ -85,6 +91,7 @@ class ModelRunner:
                                                   downsample=pretrained_model.hparams.downsample,
                                                   data_path=self.data_file,
                                                   flip=self.hparams.flip,
+                                                  # use hparams dates to eval on different data slices
                                                   dataset_date=self.hparams.dataset_date,
                                                   dataset_ratio=self.hparams.dataset_ratio
                                                   )
@@ -95,7 +102,8 @@ class ModelRunner:
                                           top_2=self.hparams.top_2,
                                           run_cm=self.hparams.run_cm,
                                           plot_clusters=self.hparams.plot_clusters,
-                                          write_indices=self.hparams.write_indices)
+                                          write_indices=self.hparams.write_indices,
+                                          track_indices=self.hparams.track_indices)
         else:
             data = FireflyDataModule(data_dir='data',
                                      augmentations=self.augmentations,

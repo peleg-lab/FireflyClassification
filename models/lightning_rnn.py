@@ -269,6 +269,8 @@ class LITGRU(pl.LightningModule):
                                help='Whether to plot TSNE clusters')
         subparser.add_argument('--write_indices', default=False, type=bool,
                                help='Whether to write indices of top performing sequences')
+        subparser.add_argument('--track_indices', default=False, type=bool,
+                               help='Whether to track indices of top performing sequences')
 
         subparser.add_argument('--load', action='store_true', help='Enable loading from saved dataloaders')
 
@@ -330,9 +332,13 @@ class LITGRU(pl.LightningModule):
                        cumulative_dict=None):
         y_pred = []
         y_true = []
-        topx = 2
         y_pred_topx = []
+
         softmax_indices_for_each_class = {0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: []}
+
+        topx = 2
+        ax = None
+
         if plot_clusters:
             fig = plt.figure(figsize=(6, 6))
             ax = Axes3D(fig)
@@ -344,6 +350,7 @@ class LITGRU(pl.LightningModule):
                 indices = test_dataloader.dataset.indices[indexx:indexx+test_dataloader.batch_size]
                 indexx += test_dataloader.batch_size
                 seq_lens = []
+
                 for _x_ in x:
                     z = numpy.where(_x_.cpu() != 2)[0]
                     seq_lens.append(len(z))
@@ -354,10 +361,10 @@ class LITGRU(pl.LightningModule):
                                               enforce_sorted=False)
                 padded = pad_packed_sequence(packed, batch_first=True)
                 batch_output, hidden = self.forward(padded[0].to(self.device))
-                # compute loss
+
                 if plot_clusters:
-                    #self.pca_cluster(hidden, y, ax)
                     self.tsne_cluster(hidden, y, ax)
+
                 output_logits = batch_output.permute(1, 0, 2)
                 final_logit = output_logits[-1]
                 softmax_vals = nn.Softmax(dim=1)(final_logit)
@@ -372,14 +379,18 @@ class LITGRU(pl.LightningModule):
                 y_true.extend(list(y.cpu().detach().numpy()))
                 y_pred_topx.extend(list([x[:topx] for x in (-softmax_vals).argsort()]))
 
-        # for k in softmax_indices_for_each_class.keys():
-        #     sorted_vals = sorted(softmax_indices_for_each_class[k], key=lambda x: x[1], reverse=True)
-        #     top_indices = [(i, j) for i, j in sorted_vals]
-        #     cumulative_dict[k].extend(top_indices)
+        # tracking performant indices
+        if cumulative_dict:
+            for k in softmax_indices_for_each_class.keys():
+                sorted_vals = sorted(softmax_indices_for_each_class[k], key=lambda x: x[1], reverse=True)
+                top_indices = [(i, j) for i, j in sorted_vals]
+                cumulative_dict[k].extend(top_indices)
+
         if plot_clusters:
             ax.set_facecolor('white')
             plt.savefig('figs/pca_3d{}.eps'.format(self.hparams['version']), dpi=600, facecolor='white')
             plt.close(fig)
+
         if return_cm:
             return self.accuracy_eval_via_confusion_matrix(y_true, y_pred, y_pred_topx, n_classes, topx, save, return_cm, top_2)
         else:

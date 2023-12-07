@@ -7,7 +7,7 @@ import pandas as pd
 import seaborn as sns
 
 
-def plot_each(results_dict):
+def plot_each(rdict):
     colormap = {'bw': 'dodgerblue', 'ic': 'mediumorchid', 'uf': 'olivedrab', 'ik': 'orange', 'io': 'midnightblue'}
     linestylemap = {'bw': {'ic': 'solid',
                            'uf': 'dotted',
@@ -34,7 +34,7 @@ def plot_each(results_dict):
     species_pairs_seen = []
     species_vals = {}
 
-    for k in results_dict.keys():
+    for k in rdict.keys():
         substrings = k[int(len(k) / 2):], k[:int(len(k) / 2)]
         print(substrings)
 
@@ -45,7 +45,7 @@ def plot_each(results_dict):
                 other_species_val = substrings[1][:2]
             else:
                 other_species_val = substrings[0][:2]
-            y_val = min(1, (results_dict[k][species_val] / results_dict[k]['iterations']))
+            y_val = min(1, (rdict[k][species_val] / rdict[k]['iterations']))
             if species_vals.get(species_val):
                 if species_vals[species_val].get(other_species_val):
                     species_vals[species_val][other_species_val].append((x_val, y_val))
@@ -53,11 +53,12 @@ def plot_each(results_dict):
                     species_vals[species_val][other_species_val] = [(x_val, y_val)]
 
             else:
-                species_vals[species_val] = {other_species_val: [(x_val, y_val)]
-                                             }
+                species_vals[species_val] = {
+                    other_species_val: [(x_val, y_val)]
+                }
 
     for sp in species_vals.keys():
-        fig, ax=plt.subplots()
+        fig, ax = plt.subplots()
         for osp in species_vals[sp].keys():
             xs = [x[0] for x in species_vals[sp][osp]]
             ys = [x[1] for x in species_vals[sp][osp]]
@@ -76,15 +77,15 @@ def plot_each(results_dict):
         plt.savefig('figs/all_sweeps_scores_{}_line.svg'.format(sp), dpi=800)
 
 
-def plot_pairwise(results_dict, sp):
+def plot_pairwise(rdict, sp):
     data = pd.read_csv('data/real_data/flash_sequence_data.csv')
     for species_y in ['io', 'uf', 'ic', 'bw', 'ik']:
         if sp != species_y:
             fig, ax = plt.subplots()
             indices = []
-            for k in results_dict.keys():
+            for k in rdict.keys():
                 if '{}0.05'.format(sp) in k and species_y in k:
-                    indices.extend(results_dict[k]['indices'][0])
+                    indices.extend(rdict[k]['indices'][0])
             subset = data.iloc[indices]
             subset = subset[~subset.index.duplicated()]
             sns.histplot(data=subset, x='flash_duration', hue='species_label', ax=ax, common_norm=False, common_bins=True,
@@ -102,12 +103,12 @@ def plot_pairwise(results_dict, sp):
             plt.savefig('{}0.05_w_{}_num_flashes.svg'.format(sp, species_y), dpi=800)
 
 
-def plot_sweeps(results_dict):
+def plot_sweeps(rdict):
     colormap = {'bw': 'dodgerblue', 'ic': 'mediumorchid', 'uf': 'olivedrab', 'ik': 'orange', 'io': 'midnightblue'}
     fig, ax = plt.subplots()
     markermap = {'bw': '.', 'ic': '<', 'uf': '>', 'ik': 's', 'io': 'x'}
     species_pairs_seen = []
-    for k in results_dict.keys():
+    for k in rdict.keys():
         substrings = k[int(len(k) / 2):], k[:int(len(k) / 2)]
         print(substrings)
         for i, substring in enumerate(substrings):
@@ -117,7 +118,7 @@ def plot_sweeps(results_dict):
                 other_species_val = substrings[1][:2]
             else:
                 other_species_val = substrings[0][:2]
-            y_val = min(1, (results_dict[k][species_val] / results_dict[k]['iterations']))
+            y_val = min(1, (rdict[k][species_val] / rdict[k]['iterations']))
             if (species_val, other_species_val) in species_pairs_seen:
                 ax.scatter(x_val, y_val, c=colormap[species_val], marker=markermap[other_species_val])
             else:
@@ -133,11 +134,9 @@ def plot_sweeps(results_dict):
     plt.savefig('figs/all_sweeps_scores.png')
 
 
-def plot_all(results_dict):
+def plot_all(rdict):
     colormap = {'bw': 'dodgerblue', 'ic': 'mediumorchid', 'uf': 'olivedrab', 'ik': 'orange', 'io': 'midnightblue'}
     fig, ax = plt.subplots()
-    markermap = {'bw': '.', 'ic': '<', 'uf': '>', 'ik': 's', 'io': 'x'}
-    alphamap = {'bw': 0.5, 'ic': 0.6, 'uf': 0.7, 'ik': 0.8, 'io': 0.9}
     linestylemap = {'bw': {'ic': 'solid',
                            'uf': 'dotted',
                            'ik': 'dashed',
@@ -163,7 +162,7 @@ def plot_all(results_dict):
     species_pairs_seen = []
     species_vals = {}
 
-    for k in results_dict.keys():
+    for k in rdict.keys():
         substrings = k[int(len(k) / 2):], k[:int(len(k) / 2)]
         print(substrings)
 
@@ -174,7 +173,7 @@ def plot_all(results_dict):
                 other_species_val = substrings[1][:2]
             else:
                 other_species_val = substrings[0][:2]
-            y_val = min(1, (results_dict[k][species_val] / results_dict[k]['iterations']))
+            y_val = min(1, (rdict[k][species_val] / rdict[k]['iterations']))
             if species_vals.get(species_val):
                 if species_vals[species_val].get(other_species_val):
                     species_vals[species_val][other_species_val].append((x_val, y_val))
@@ -205,37 +204,34 @@ def plot_all(results_dict):
     plt.savefig('figs/all_sweeps_scores_plus_line.svg', dpi=800)
 
 
-def plot_different(results_dict):
-    colormap = {'bw': 'dodgerblue', 'ic': 'mediumorchid', 'uf': 'olivedrab', 'ik': 'orange', 'io': 'midnightblue'}
+def plot_different(rdict):
     fig,ax = plt.subplots()
-    markermap = {'bw': '.', 'ic': '<', 'uf': '>', 'ik': 's', 'io': 'x'}
     total_scores = {}
     errors = {}
     total_at_each = {}
-    for k in results_dict.keys():
+    for k in rdict.keys():
         substrings = k[int(len(k) / 2):], k[:int(len(k) / 2)]
         for i, substring in enumerate(substrings):
             x_val = float(substring[3:])
             species_val = substring[:2]
             if total_at_each.get(x_val):
-                total_at_each[x_val].append(results_dict[k][species_val] / results_dict[k]['iterations'])
+                total_at_each[x_val].append(rdict[k][species_val] / rdict[k]['iterations'])
             else:
-                total_at_each[x_val] = [(results_dict[k][species_val] / results_dict[k]['iterations'])]
-    for k in results_dict.keys():
+                total_at_each[x_val] = [(rdict[k][species_val] / rdict[k]['iterations'])]
+    for k in rdict.keys():
         substrings = k[int(len(k) / 2):], k[:int(len(k) / 2)]
         print(substrings)
         for i, substring in enumerate(substrings):
             x_val = float(substring[3:])
             species_val = substring[:2]
             if total_scores.get(x_val):
-                total_scores[x_val] += results_dict[k][species_val] / results_dict[k]['iterations']
+                total_scores[x_val] += rdict[k][species_val] / rdict[k]['iterations']
             else:
-                total_scores[x_val] = results_dict[k][species_val] / results_dict[k]['iterations']
+                total_scores[x_val] = rdict[k][species_val] / rdict[k]['iterations']
             if not errors.get(x_val):
                 errors[x_val] = stats.sem(total_at_each[x_val])
     error_s = [(a, b) for a, b in errors.items()]
     sorted_error_s = sorted(error_s, key=lambda x: x[0])
-    exs = [x for x, y in sorted_error_s]
     eys = [y for x, y in sorted_error_s]
 
     pairs = [(a, (5*b) / 100) for a,b in total_scores.items()]
