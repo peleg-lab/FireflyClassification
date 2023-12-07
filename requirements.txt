@@ -10,4 +10,5 @@ scipy
 pandas
 scikit-learn
 seaborn
+multiprocesssing
 fastdtw
