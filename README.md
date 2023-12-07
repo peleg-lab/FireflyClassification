@@ -24,13 +24,14 @@ Many parameters are exposed at runtime. You can change the number of samples, th
 ```
 --n_layers 2 --batch_size 8 --learning_rate 0.00001  --epochs 500 --version 2 --n_classes 7 --downsample
 ```
+For a full description of the runtime parameters, please see the -h help when running nn_lightning.py
 
-If you do not specify the '--data_file' argument, the model will run with our dataset by default. However, extensions of the dataset can be made, and passed in as a different data file using that argument. If you do extend the dataset and re-train the model, please make sure the columns of the data match what we have provided in 'flash_pattern_data.csv'.
+If you do not specify the '--data_file' argument, the model will run with our dataset by default. However, extensions of the dataset can be made, and passed in as a different data file using that argument. If you do extend the dataset and re-train the model, please make sure the columns of the data match what we have provided in 'flash_sequence_data.csv'.
 
 A useful test of your installation would be running some inference from the loaded checkpoints. Each of the checkpoints represents a fully realized training run with a different data split. 
 
 ```
-python nn_lightning.py gru --resume_from pretrained_rnn/rnn_iter_{2.0}.ckpt
+python nn_lightning.py gru --resume_from pretrained_rnn/rnn_iter_{23.0}.ckpt
 ```
 
 This will generate a report of the model results in the terminal, as well as confusion matrices and ROC / PR curves for the particular version and test set in the /figs folder.
@@ -62,4 +63,7 @@ Num_flashes = unitless integer
 
 Flash_duration, ifi = seconds
 
-Timeseries = each point is a frame at 30 frames per second
+Timeseries = each point is a frame, recorded @ 30 frames per second
+
+## Sympatry experiment results
+The json file results_dict_500.json contains the true positive rates for the 5 most common species when run in artificially generated synthetic swarms of differing density, as described in Section 2.2 of the accompanying paper. 
