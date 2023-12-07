@@ -17,26 +17,18 @@ class ModelRunner:
         self.hparams.output_size = self.hparams.n_classes
         self.data_dir = self.hparams.data_dir
         self.dataloaders_dir = self.hparams.dataloaders_dir
-        self.data_file = self.hparams.data_file or 'flash_pattern_data.csv'
-        self.metrics = Metrics()
+        self.data_file = self.hparams.data_file or 'flash_sequence_data.csv'
+        self.metrics = Metrics(hparams)
 
         self.rnn_checkpoint_path = "/ckpts/"
         self.rnn_log_path = "lightning_logs"
 
-        self.top_2 = False
-        self.run_cm = False
-        self.plot_clusters = False
-
-    def set_stat_bools(self, top_2=False, run_cm=False, plot_clusters=False):
-        self.top_2 = top_2
-        self.run_cm = run_cm
-        self.plot_clusters = plot_clusters
-
-    def run_rnn(self):
+    def run_rnn(self, return_stats=False):
         # runs the main training/val loop, etc...
         if self.hparams.resume_from != "none":
-            self.set_stat_bools(False, True, False)
             p = os.getcwd() + self.rnn_checkpoint_path + self.hparams.resume_from
+
+            # one model
             if "all" not in self.hparams.resume_from:
                 pretrained_model = LITGRU.load_from_checkpoint(p, map_location=lambda storage, loc: storage)
 
@@ -50,13 +42,30 @@ class ModelRunner:
                                        gen_seed=pretrained_model.hparams.gen_seed,
                                        downsample=pretrained_model.hparams.downsample,
                                        data_path=self.data_file,
-                                       flip=False#pretrained_model.hparams.flip
+                                       flip=False,
+                                       dataset_date=self.hparams.dataset_date,
+                                       dataset_ratio=self.hparams.dataset_ratio
                                        )
                 pretrained_models = [pretrained_model]
-                self.metrics.eval_metrics(pretrained_models, [data.test_dataloader()],
-                                          top_2=self.top_2,
-                                          run_cm=self.run_cm,
-                                          plot_clusters=self.plot_clusters)
+                if return_stats:
+                    cm = self.metrics.eval_metrics(pretrained_models, [data.test_dataloader()],
+                                                   top_2=self.hparams.top_2,
+                                                   run_cm=self.hparams.run_cm,
+                                                   plot_clusters=self.hparams.plot_clusters,
+                                                   write_indices=self.hparams.write_indices,
+                                                   return_stats=return_stats,
+                                                   track_indices=self.hparams.track_indices)
+                    return cm, data.test_dataloader().dataset.indices
+                else:
+                    self.metrics.eval_metrics(pretrained_models, [data.test_dataloader()],
+                                              top_2=self.hparams.top_2,
+                                              run_cm=self.hparams.run_cm,
+                                              plot_clusters=self.hparams.plot_clusters,
+                                              write_indices=self.hparams.write_indices,
+                                              return_stats=return_stats,
+                                              track_indices=self.hparams.track_indices)
+
+            # ensemble of models
             else:
                 pretrained_models = []
                 data = []
@@ -81,23 +90,32 @@ class ModelRunner:
                                                   gen_seed=pretrained_model.hparams.gen_seed,
                                                   downsample=pretrained_model.hparams.downsample,
                                                   data_path=self.data_file,
-                                                  flip=self.hparams.flip
+                                                  flip=self.hparams.flip,
+                                                  # use hparams dates to eval on different data slices
+                                                  dataset_date=self.hparams.dataset_date,
+                                                  dataset_ratio=self.hparams.dataset_ratio
                                                   )
                         _data = rf_data.test_dataloader()
                     pretrained_models.append(pretrained_model)
                     data.append(_data)
-                self.metrics.eval_metrics(pretrained_models, data, top_2=self.top_2, run_cm=self.run_cm,
-                                          plot_clusters=self.plot_clusters)
+                self.metrics.eval_metrics(pretrained_models, data,
+                                          top_2=self.hparams.top_2,
+                                          run_cm=self.hparams.run_cm,
+                                          plot_clusters=self.hparams.plot_clusters,
+                                          write_indices=self.hparams.write_indices,
+                                          track_indices=self.hparams.track_indices)
         else:
             data = FireflyDataModule(data_dir='data',
                                      augmentations=self.augmentations,
                                      class_limit=self.hparams.n_classes,
                                      batch_size=self.hparams.batch_size,
                                      val_split=self.hparams.val_split,
-                                     gen_seed=self.hparams.gen_seed,
+                                     gen_seed=self.hparams.version,
                                      downsample=self.hparams.downsample,
                                      data_path=self.data_file,
-                                     flip=self.hparams.flip
+                                     flip=self.hparams.flip,
+                                     dataset_date=self.hparams.dataset_date,
+                                     dataset_ratio=self.hparams.dataset_ratio
                                      )
 
             model = LITGRU(self.hparams)

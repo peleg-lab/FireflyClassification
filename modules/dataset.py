@@ -34,7 +34,7 @@ class RealFlashPatterns(Dataset):
             data = data.loc[data['num_flashes'] > 1]
             print('Ignoring sequences with < 2 flashes in the dataset')
         binary_df = data['timeseries']
-        flash_df = data[['species', 'species_label']]
+        flash_df = data[['species', 'species_label', 'Dataset']]
 
         binary_data, flash_df = self._embed(binary_df, flash_df)
 
@@ -84,3 +84,7 @@ class RealFlashPatterns(Dataset):
     @property
     def n_timesteps(self):
         return self._data.shape[1]
+
+    @property
+    def dataset(self):
+        return self._meta_data.Dataset

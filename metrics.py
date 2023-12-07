@@ -4,6 +4,7 @@ import io
 import numpy as np
 import seaborn as sns
 import pandas as pd
+from collections import Counter
 
 import matplotlib.pyplot as plt
 
@@ -27,10 +28,11 @@ class CPU_Unpickler(pickle.Unpickler):
 
 
 class Metrics:
-    def __init__(self):
+    def __init__(self, hparams):
         self.CPU_Unpickler = CPU_Unpickler
         self.rnn_logs = "./lightning_logs/"
         self.fig_path = './figs'
+        self.hparams = hparams
 
     @staticmethod
     def gather(arr, idx):
@@ -41,16 +43,36 @@ class Metrics:
                 ret_arr = np.concatenate((ret_arr, sublist))
         return ret_arr
 
-    def eval_metrics(self, pretrained_models, data, top_2=False, run_cm=False, plot_clusters=False):
+    def eval_metrics(self, pretrained_models, data,
+                     top_2=False,
+                     run_cm=False,
+                     plot_clusters=False,
+                     write_indices=False,
+                     return_stats=False,
+                     track_indices=False):
         n_classes_model = pretrained_models[0].hparams.n_classes
         plot = True
         cm = None
         model_cms = []
+        if track_indices:
+            cumulative_dict = {0: [],
+                               1: [],
+                               2: [],
+                               3: [],
+                               4: [],
+                               5: [],
+                               6: []}
+        else:
+            cumulative_dict = None
         num_runs = len(pretrained_models)
         if run_cm:
             for model, d in zip(pretrained_models, data):
                 model_cm = model.eval_real_data(d, model.hparams.n_classes,
-                                                save=False, return_cm=True, top_2=top_2, plot_clusters=plot_clusters)
+                                                save=False,
+                                                return_cm=True,
+                                                top_2=top_2,
+                                                plot_clusters=plot_clusters,
+                                                cumulative_dict=cumulative_dict)
                 if cm is None:
                     cm = model_cm
                     model_cms.append(model_cm)
@@ -59,8 +81,38 @@ class Metrics:
                         for j in range(n_classes_model):
                             cm[i, j] += model_cm[i, j]
                     model_cms.append(model_cm)
+
+            if write_indices:
+                top_indices = {i: None for i in cumulative_dict.keys()}
+                for k in cumulative_dict.keys():
+                    sorted_vals = sorted(cumulative_dict[k], key=lambda x: x[1], reverse=True)
+                    top_indices[k] = sorted_vals
+
+                with open('sorted_indices.txt', 'w') as f:
+                    for k in top_indices.keys():
+                        f.write('{{ {}: '.format(k))
+                        for i,v in enumerate(top_indices[k]):
+                            if i != len(top_indices[k]):
+                                f.write("{},".format(v[0]))
+                            else:
+                                f.write("{}".format(v[0]))
+                        if k < max(top_indices.keys()):
+                            f.write("},\n")
+                        else:
+                            f.write("}}")
+
             cm = cm / len(pretrained_models)
-            self.plot_cm(cm, model_cms, n_classes_model, num_runs, top_2=top_2)
+            if return_stats:
+                return cm
+            if plot:
+                self.plot_cm(cm, model_cms, n_classes_model, num_runs, top_2=top_2)
+            else:
+                if self.hparams.dataset_date != '':
+                    np.savetxt('{}classes_{}days_{}ratio_confusion_matrix.txt'.format(
+                        n_classes_model,
+                        self.hparams.dataset_date,
+                        self.hparams.dataset_ratio),
+                        cm)
 
         y_tests = []
         y_preds = []
@@ -85,6 +137,7 @@ class Metrics:
             y_test = lb.transform(y_true)
             y_tests.append(y_test.reshape(np.array(y_pred).shape))
             y_preds.append(np.array(y_pred))
+
         if plot:
             self.plot_roc_curve(n_classes_model, y_tests, y_preds)
             self.plot_pre_rec_curve(n_classes_model, y_tests, y_preds)
@@ -103,6 +156,7 @@ class Metrics:
             print('f1 for class {}: {}'.format(c_label, np.mean(class_f1s[c_label])))
             print('f1 std for class {}: {}'.format(c_label, np.std(class_f1s[c_label])))
         print(all_reports)
+        print('done with metrics')
 
     def timeseries_and_cm(self, path, cnn=True):
         if cnn:
@@ -133,15 +187,19 @@ class Metrics:
         colormap = {0: 'dodgerblue', 1: 'cyan', 2: 'mediumorchid', 3: 'maroon',
                     4: 'olivedrab', 5: 'orange', 6: 'midnightblue'}
         fig, ax = plt.subplots()
+        to_save = dict.fromkeys([0, 1, 2, 3, 4, 5, 6])
         for (idx, c_label) in enumerate(range(n_classes_model)):
             y_true = self.gather(y_trues, idx)
             y_pred = self.gather(y_preds, idx)
             fpr, tpr, thresholds = roc_curve(y_true, y_pred)
+            to_save[c_label] = {'tpr': tpr,
+                                'fpr': fpr}
             ax.plot(fpr, tpr,
                     label='{}'.format(names.name_dict['all_names'][idx]),
                     color=colormap[idx],
                     lw=2,
                     )
+
         ax.plot([0, 1], [0, 1], color="dimgray", lw=2, linestyle="--")
         ax.set_xlim([0.0, 1.0])
         ax.set_ylim([0.0, 1.05])
@@ -151,6 +209,9 @@ class Metrics:
 
         plt.tight_layout()
         plt.savefig(self.fig_path + '/roc_curves.png')
+        df_to_save = pd.DataFrame(to_save)
+        with open('roc_curve_vals_7_updated.csv', 'w') as f:
+            df_to_save.to_csv(f)
 
     def report_auroc(self, n_classes_model, y_trues, y_preds):
         for (idx, c_label) in enumerate(range(n_classes_model)):
@@ -195,6 +256,8 @@ class Metrics:
             print('Class {}: AuPRC {} vs. baseline {}'.format(c_label, auprc, no_skill))
 
     def plot_cm(self, cm, model_cms, n_classes_model, num_runs, top_2=False):
+        for line in cm:
+            print(line)
         acc = round(np.trace(cm) / cm.sum(), 4)
         true_pos = np.diag(cm)
         false_pos = np.sum(cm, axis=0) - true_pos
