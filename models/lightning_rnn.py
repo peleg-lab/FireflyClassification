@@ -301,6 +301,41 @@ class LITGRU(pl.LightningModule):
         items.pop("v_num", None)
         return items
 
+    def probs_at_thresholds_with_unknown(self, test_dataloader, unknown_class, unknown_threshold=0.3):
+        y_pred = []
+        y_true = []
+
+        with torch.no_grad():  # Deactivate gradients for the following code
+            for data_inputs, data_labels, data_names in test_dataloader:
+                x, y, _ = data_inputs, data_labels, data_names
+                seq_lens = [len(numpy.where(_x_.cpu() != 2)[0]) for _x_ in x]
+                seq_lens = torch.LongTensor(seq_lens)
+
+                y = y.to(self.device)
+                embed_x = self.embed(x.to(torch.int64))
+
+                packed = pack_padded_sequence(embed_x, seq_lens.cpu().numpy(), batch_first=True,
+                                              enforce_sorted=False)
+                padded = pad_packed_sequence(packed, batch_first=True)
+
+                batch_output, hidden = self.forward(padded[0].to(self.device))
+                output_logits = batch_output.permute(1, 0, 2)  # Shape: (seq_len, batch_size, num_classes)
+                final_logit = output_logits[-1]  # Get last time-step logits
+
+                softmax_vals = nn.Softmax(dim=1)(final_logit)
+                max_probs, preds = torch.max(softmax_vals, dim=1)
+
+                # Assign "unknown" class if confidence is below threshold
+                preds_with_unknown = [
+                    pred.item() if max_prob >= unknown_threshold else unknown_class
+                    for pred, max_prob in zip(preds, max_probs)
+                ]
+
+                y_pred.append(preds_with_unknown)
+                y_true.append(y.cpu().tolist())
+
+        return y_pred, y_true
+
     def probs_at_thresholds(self, test_dataloader):
         y_pred = []
         y_true = []
@@ -333,8 +368,7 @@ class LITGRU(pl.LightningModule):
         y_pred = []
         y_true = []
         y_pred_topx = []
-
-        softmax_indices_for_each_class = {0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: []}
+        softmax_indices_for_each_class = {i: [] for i in range(n_classes)}
 
         topx = 2
         ax = None
@@ -368,7 +402,7 @@ class LITGRU(pl.LightningModule):
                 output_logits = batch_output.permute(1, 0, 2)
                 final_logit = output_logits[-1]
                 softmax_vals = nn.Softmax(dim=1)(final_logit)
-                for i,j in enumerate(softmax_vals):
+                for i, j in enumerate(softmax_vals):
                     max_prob = j.max().item()
                     tru = y[i].item()
                     pre = j.argmax().item()
@@ -401,18 +435,7 @@ class LITGRU(pl.LightningModule):
         acc = numpy.mean([yt == yp for yt, yp in zip(y_true, y_pred)])
         topx_acc = numpy.mean([y_t in y_p for y_t, y_p in zip(y_true, y_pred_topx)])
 
-        if n_classes_model == 3:
-            nams = names.name_dict[3]
-        elif n_classes_model == 14:
-            nams = names.name_dict['shorter_names']
-        elif n_classes_model == 6:
-            nams = names.name_dict[6]
-        elif n_classes_model == 5:
-            nams = names.name_dict[5]
-        elif n_classes_model == 4:
-            nams = names.name_dict[4]
-        else:
-            nams = names.name_dict['all_names']
+        nams = names.name_dict['all_names'] # 'all_names
         print(f"Accuracy of the model: {100.0 * acc:4.2f}%")
         print(f"Accuracy of the top {topx} guesses: {100.0 * topx_acc:4.2f}%")
 
@@ -435,7 +458,7 @@ class LITGRU(pl.LightningModule):
                     new_y_pred.append(yp_1)
             y_pred = new_y_pred
         cm = confusion_matrix(y_true, y_pred)
-        cm = numpy.transpose(numpy.transpose(cm) / cm.astype(numpy.float).sum(axis=1))
+        cm = numpy.transpose(numpy.transpose(cm) / cm.astype(float).sum(axis=1))
         if not return_cm:
             fig, ax3 = plt.subplots(figsize=(12, 8))
             img = ax3.imshow(cm, cmap='Blues')

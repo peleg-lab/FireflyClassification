@@ -34,6 +34,19 @@ class Metrics:
         self.fig_path = './figs'
         self.hparams = hparams
 
+        self.model_colormap = {i: color
+                               for i, color
+                               in enumerate(['dodgerblue',
+                                             'cyan',
+                                             'mediumorchid',
+                                             'maroon',
+                                             'olivedrab',
+                                             'orange',
+                                             'midnightblue',
+                                             'gray'
+                                             ])
+                               }
+
     @staticmethod
     def gather(arr, idx):
         ret_arr = []
@@ -55,13 +68,7 @@ class Metrics:
         cm = None
         model_cms = []
         if track_indices:
-            cumulative_dict = {0: [],
-                               1: [],
-                               2: [],
-                               3: [],
-                               4: [],
-                               5: [],
-                               6: []}
+            cumulative_dict = {i: [] for i in range(n_classes_model)}
         else:
             cumulative_dict = None
         num_runs = len(pretrained_models)
@@ -116,9 +123,9 @@ class Metrics:
 
         y_tests = []
         y_preds = []
-        class_precisions = {'0': [], '1': [], '2': [], '3': [], '4': [], '5': [], '6': [], '7': []}
-        class_f1s = {'0': [], '1': [], '2': [], '3': [], '4': [], '5': [], '6': [], '7': []}
-        class_recalls = {'0': [], '1': [], '2': [], '3': [], '4': [], '5': [], '6': [], '7': []}
+        class_precisions = {str(i): [] for i in range(n_classes_model)}
+        class_f1s = {str(i): [] for i in range(n_classes_model)}
+        class_recalls = {str(i): [] for i in range(n_classes_model)}
         all_reports = []
         for model, d in zip(pretrained_models, data):
             y_pred, y_true = model.probs_at_thresholds(d)
@@ -184,10 +191,10 @@ class Metrics:
         plt.close(fig)
 
     def plot_roc_curve(self, n_classes_model, y_trues, y_preds):
-        colormap = {0: 'dodgerblue', 1: 'cyan', 2: 'mediumorchid', 3: 'maroon',
-                    4: 'olivedrab', 5: 'orange', 6: 'midnightblue'}
+        colormap = self.model_colormap
+
         fig, ax = plt.subplots()
-        to_save = dict.fromkeys([0, 1, 2, 3, 4, 5, 6])
+        to_save = dict.fromkeys([range(n_classes_model)])
         for (idx, c_label) in enumerate(range(n_classes_model)):
             y_true = self.gather(y_trues, idx)
             y_pred = self.gather(y_preds, idx)
@@ -222,7 +229,7 @@ class Metrics:
             print('Class {}: AUROC {}'.format(c_label, auc(fpr, tpr)))
 
     def plot_pre_rec_curve(self, n_classes_model, y_trues, y_preds):
-        fig, c_ax = plt.subplots(1, 5, figsize=(25, 3))
+        fig, c_ax = plt.subplots(1, n_classes_model, figsize=(25, 3))
         for (idx, c_label) in enumerate(range(n_classes_model)):
             y_true = self.gather(y_trues, c_label)
             y_pred = self.gather(y_preds, c_label)
