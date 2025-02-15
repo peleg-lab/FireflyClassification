@@ -55,9 +55,9 @@ mapping = {0: 'flash_length',
            13: 'timeseries',
            14: 'folder_name',
            15: 'date_str',
-           16: 'label',
+           16: 'species_label',
            17: 'species',
-           17: 'ecc'}
+           18: 'ecc'}
 
 r_map = {
     'flash_length': 0,
@@ -76,7 +76,7 @@ r_map = {
     'timeseries': 13,
     'folder_name': 14,
     'date_str': 15,
-    'label': 16,
+    'species_label': 16,
     'species': 17,
     'ecc': 18
 }
@@ -138,57 +138,63 @@ def calc_displacements(x, y, z):
 
 def trim_and_collate(cdf, dfc):
 
-    headers = [
-        'flash_length', 'flash_gap', 'flash_count', 'v', 'totm', 'ecc', 'timeseries',
-        'species', 'species_label', 'Dataset'
-    ]
+    numeric_headers = ['flash_length', 'flash_gap', 'flash_count', 'v', 'totm', 'ecc']
+    headers = list(r_map.keys())
 
     cdf = pd.DataFrame(cdf, columns=headers)
 
     scaler = MinMaxScaler()
     scaled_data = scaler.fit_transform([
-        tuple(x[h] for feature in headers)
+        tuple(x[h] for h in numeric_headers)
         for x in cdf
     ])
     shifted_data = scaled_data + abs(np.min(scaled_data)) + 1  # Make positive
     log_transformed_data = np.log(shifted_data)
 
-    normed_scaled_data = normalize(log_transformed_data, norm='l2')
-    print('Mapping trajectories to clusters...\r')
-    mapping_dict = cdf.set_index('traj')['cluster'].to_dict()
-    dfc['cluster'] = dfc['j'].map(mapping_dict)
+    normed_data = normalize(log_transformed_data, norm='l2')
+    normed_data = pd.DataFrame(normed_data, columns=headers)
 
-    value_counts = dfc['cluster'].value_counts()
+    # cluster logic follows:
+    # this will be where we restrict / relabel aspects of the data depending on cluster membership... but only once that
+    # is all up and running
 
-    # keep only clusters that are more prevalent than 1% of the data
-    values_to_keep = value_counts[value_counts >= (len(dfc) / 100)].index.tolist()
-    result_df = dfc[dfc['cluster'].isin(values_to_keep)]
-    print('...done')
+    # print('Mapping trajectories to clusters...\r')
+    # mapping_dict = cdf.set_index('traj')['cluster'].to_dict()
+    # dfc['cluster'] = dfc['j'].map(mapping_dict)
+    #
+    # value_counts = dfc['cluster'].value_counts()
+    #
+    # # keep only clusters that are more prevalent than 1% of the data
+    # values_to_keep = value_counts[value_counts >= (len(dfc) / 100)].index.tolist()
+    # result_df = dfc[dfc['cluster'].isin(values_to_keep)]
+    # print('...done')
+    #
+    # # drop the noise cluster
+    # feature_df = cdf[cdf['cluster'].isin(values_to_keep)]
+    # result_df = result_df.loc[result_df['cluster'] != -1]
+    # feature_df = feature_df.loc[feature_df['cluster'] != -1]
+    # cluster_splits = list(set(result_df.cluster.values))
+    # print('Filtering out clusters that occur < 1% of the activity...\r')
+    #
+    # # Calculate instance percentage, and filter by occurrence percent
+    # instance_percentages = {
+    #     cluster: round(len(result_df[result_df['cluster'] == cluster]) / len(result_df), 3) * 100
+    #     for cluster in cluster_splits
+    # }
+    # filtered_clusters = {
+    #     cluster: percent for cluster, percent in instance_percentages.items() if percent >= 1.0
+    # }
+    # filtered_clusters = list(filtered_clusters.keys())
+    #
+    # feature_df = feature_df[feature_df['cluster'].isin(filtered_clusters)]
+    # result_df = result_df[result_df['cluster'].isin(filtered_clusters)]
+    cdf[numeric_headers] = normed_data[numeric_headers].values
 
-    # drop the noise cluster
-    feature_df = cdf[cdf['cluster'].isin(values_to_keep)]
-    result_df = result_df.loc[result_df['cluster'] != -1]
-    feature_df = feature_df.loc[feature_df['cluster'] != -1]
-    cluster_splits = list(set(result_df.cluster.values))
-    print('Filtering out clusters that occur < 1% of the activity...\r')
+    feature_df = cdf
+    result_df = dfc
 
-    # Calculate instance percentage, and filter by occurrence percent
-    instance_percentages = {
-        cluster: round(len(result_df[result_df['cluster'] == cluster]) / len(result_df), 3) * 100
-        for cluster in cluster_splits
-    }
-    filtered_clusters = {
-        cluster: percent for cluster, percent in instance_percentages.items() if percent >= 1.0
-    }
-    filtered_clusters = list(filtered_clusters.keys())
-
-    feature_df = feature_df[feature_df['cluster'].isin(filtered_clusters)]
-    result_df = result_df[result_df['cluster'].isin(filtered_clusters)]
-
-    dataset_mapping = cdf.set_index('traj')['date_str'].to_dict()
-    feature_df['Dataset'] = feature_df['traj'].map(dataset_mapping)
-    feature_df['species_label'] = feature_df['traj']['label'].map(dataset_mapping)
-    feature_df['species'] = feature_df['traj']['species'].map(dataset_mapping)
+    datemapping = cdf.set_index('traj')['date_str'].to_dict()
+    feature_df['Dataset'] = feature_df['traj'].map(datemapping)
     print('...done')
     return feature_df, result_df
 
@@ -330,83 +336,100 @@ def extract_from_csv(f, file_flag=True):
         # This lets you pass it a 'csvs' folder like the other stuff
         all_dfs = []
         all_combined = []
+        from pathlib import Path
+        folders = [Path(f) for f in names.dataset_folders]
+        for folder in folders:
+            for file in folder.iterdir():
+                if '.csv' in file:
+                    df = pd.read_csv(file, names=['x', 'y', 'z', 't', 'k', 'j'])
+                    label, species = get_label_species_from_filename(str(file))
+                    df_cleaned = df[df.z > -1.0]
+                    # remove potentially distorted points near the x-y origin
+                    df_cleaned = df_cleaned[(np.sqrt(df_cleaned.x ** 2 + df_cleaned.y ** 2) > 0.4)]
+                    grouped_by_traj_df = df_cleaned.groupby('j')
+                    singleflashlengths = []
+                    singleflashpos = []
+                    singlecombined = []
+                    savename = str(file).split('/')[-1].split('.')[0]
 
-        for file in os.listdir(f):  # Assuming `f` is a folder containing a list of files
-            if '.csv' in file:
-                df = pd.read_csv(f, names=['x', 'y', 'z', 't', 'k', 'j'])
-                label = get_label_from_filename(f)
-                df_cleaned = df[df.z > -1.0]
-                # remove potentially distorted points near the x-y origin
-                df_cleaned = df_cleaned[(np.sqrt(df_cleaned.x ** 2 + df_cleaned.y ** 2) > 0.4)]
-                grouped_by_traj_df = df_cleaned.groupby('j')
-                singleflashlengths = []
-                singleflashpos = []
-                singlecombined = []
-                savename = f.split('/')[-1].split('.')[0]
+                    flashlengths = []
+                    flashpos = []
+                    combined = []
+                    for group_name, group_data in grouped_by_traj_df:
+                        #  single flash in the trajectory
+                        if len(list(set(group_data.k.values))) == 1:
+                            if max(group_data.t) != min(group_data.t):
+                                traj_times = np.sort(group_data.t.values)
+                                min_t, max_t = traj_times.min(), traj_times.max()
+                                time_grid = np.arange(min_t, max_t + 1 / 30, 1 / 30)
+                                closest_times = np.array([find_closest_time(traj_times, t) for t in time_grid])
+                                time_diff = np.abs(time_grid - closest_times)
+                                timeseries = (time_diff <= 1 / 30).astype(int)
+                                singleflashlengths.append(max(group_data.t) - min(group_data.t))
+                                singleflashpos.append((np.mean(group_data.x), np.mean(group_data.y), np.mean(group_data.z)))
+                                flashlengths.append(max(group_data.t) - min(group_data.t))
+                                flashpos.append((np.mean(group_data.x), np.mean(group_data.y), np.mean(group_data.z)))
+                                singlecombined.append((max(group_data.t) - min(group_data.t), np.mean(group_data.x),
+                                                       np.mean(group_data.y), np.mean(group_data.z)))
+                                combined.append((max(group_data.t) - min(group_data.t),  # flash length [0]
+                                                 0,  # flash gap [1]
+                                                 1,  # num flashes [2]
+                                                 [np.mean(group_data.x)],  # x [6]
+                                                 [np.mean(group_data.y)],  # y [7]
+                                                 [np.mean(group_data.z)],  # z [8],
+                                                 np.mean(group_data.x),  # avx [6]
+                                                 np.mean(group_data.y),  # avy [7]
+                                                 np.mean(group_data.z),  # avz [8],
 
-                flashlengths = []
-                flashpos = []
-                combined = []
-                for group_name, group_data in grouped_by_traj_df:
-                    #  single flash in the trajectory
-                    if len(list(set(group_data.k.values))) == 1:
-                        if max(group_data.t) != min(group_data.t):
-                            traj_times = np.sort(group_data.t.values)
-                            min_t, max_t = traj_times.min(), traj_times.max()
-                            time_grid = np.arange(min_t, max_t + 1 / 30, 1 / 30)
-                            closest_times = np.array([find_closest_time(traj_times, t) for t in time_grid])
-                            time_diff = np.abs(time_grid - closest_times)
-                            timeseries = (time_diff <= 1 / 30).astype(int)
-                            singleflashlengths.append(max(group_data.t) - min(group_data.t))
-                            singleflashpos.append((np.mean(group_data.x), np.mean(group_data.y), np.mean(group_data.z)))
-                            flashlengths.append(max(group_data.t) - min(group_data.t))
-                            flashpos.append((np.mean(group_data.x), np.mean(group_data.y), np.mean(group_data.z)))
-                            singlecombined.append((max(group_data.t) - min(group_data.t), np.mean(group_data.x),
-                                                   np.mean(group_data.y), np.mean(group_data.z)))
-                            combined.append((max(group_data.t) - min(group_data.t),  # flash length [0]
-                                             0,  # flash gap [1]
-                                             1,  # num flashes [2]
-                                             [np.mean(group_data.x)],  # x [6]
-                                             [np.mean(group_data.y)],  # y [7]
-                                             [np.mean(group_data.z)],  # z [8],
-                                             np.mean(group_data.x),  # avx [6]
-                                             np.mean(group_data.y),  # avy [7]
-                                             np.mean(group_data.z),  # avz [8],
+                                                 np.mean(calc_displacements(group_data.x, group_data.y, group_data.z)),
+                                                 # v [9],
+                                                 np.sum(calc_displacements(group_data.x, group_data.y, group_data.z)),
+                                                 # sum_v[10]
+                                                 group_data.k.values[0],  # k [11],
+                                                 group_name,  # j [12]
+                                                 timeseries,  # timeseries [13]
+                                                 str(file).split('/')[-1],  # folder_name [14]
+                                                 savename,  # date [15]
+                                                 label,  # label [16]
+                                                 species))  # species [17]
 
-                                             np.mean(calc_displacements(group_data.x, group_data.y, group_data.z)),
-                                             # v [9],
-                                             np.sum(calc_displacements(group_data.x, group_data.y, group_data.z)),
-                                             # sum_v[10]
-                                             group_data.k.values[0],  # k [11],
-                                             group_name,  # j [12]
-                                             timeseries,  # timeseries [13]
-                                             f.split('/')[-1],  # folder_name [14]
-                                             savename,  # date [15]
-                                             label,  # label [16]
-                                             species))  # species [17]
+                        else:
+                            trajectory_v = calc_displacements(group_data.x, group_data.y, group_data.z)
+                            m_displacement = np.mean(trajectory_v)
+                            t_displacement = np.sum(trajectory_v)
+                            flash_count = len(list(set(group_data.k.values)))
+                            flash_gaps = []
+                            flash_lengths = []
+                            ks = []
+                            xs = []
+                            ys = []
+                            zs = []
+                            first_group = None
+                            for kgroup_name, kgroup_data in group_data.groupby('k'):
+                                if first_group is None:
+                                    first_group = kgroup_data
 
-                    else:
-                        trajectory_v = calc_displacements(group_data.x, group_data.y, group_data.z)
-                        m_displacement = np.mean(trajectory_v)
-                        t_displacement = np.sum(trajectory_v)
-                        flash_count = len(list(set(group_data.k.values)))
-                        flash_gaps = []
-                        flash_lengths = []
-                        ks = []
-                        xs = []
-                        ys = []
-                        zs = []
-                        first_group = None
-                        for kgroup_name, kgroup_data in group_data.groupby('k'):
-                            if first_group is None:
-                                first_group = kgroup_data
+                                if max(first_group.t) != max(kgroup_data.t):
+                                    flash_gap = min(kgroup_data.t) - max(first_group.t)
+                                    if flash_gap > 2 * ONE_FRAME_LENGTH:
+                                        ks.append(kgroup_name)
+                                        flash_gaps.append(flash_gap)
 
-                            if max(first_group.t) != max(kgroup_data.t):
-                                flash_gap = min(kgroup_data.t) - max(first_group.t)
-                                if flash_gap > 2 * ONE_FRAME_LENGTH:
-                                    ks.append(kgroup_name)
-                                    flash_gaps.append(flash_gap)
+                                        flash_lengths.append(max(kgroup_data.t) - min(kgroup_data.t))
+                                        flashlengths.append(max(kgroup_data.t) - min(kgroup_data.t))
+                                        xs.append(kgroup_data.x)
+                                        ys.append(kgroup_data.y)
+                                        zs.append(kgroup_data.z)
 
+                                        flashpos.append(
+                                            (np.mean(kgroup_data.x), np.mean(kgroup_data.y), np.mean(kgroup_data.z)))
+                                        first_group = kgroup_data
+                                    else:
+                                        ks.extend(list(set(kgroup_data.k.values)))
+                                        # Add current 'k' to ks, indicating merged group
+                                        group_data.loc[kgroup_data.index, 'k'] = first_group['k'].values[0]
+
+                                else:
                                     flash_lengths.append(max(kgroup_data.t) - min(kgroup_data.t))
                                     flashlengths.append(max(kgroup_data.t) - min(kgroup_data.t))
                                     xs.append(kgroup_data.x)
@@ -416,58 +439,43 @@ def extract_from_csv(f, file_flag=True):
                                     flashpos.append(
                                         (np.mean(kgroup_data.x), np.mean(kgroup_data.y), np.mean(kgroup_data.z)))
                                     first_group = kgroup_data
-                                else:
-                                    ks.extend(list(set(kgroup_data.k.values)))
-                                    # Add current 'k' to ks, indicating merged group
-                                    group_data.loc[kgroup_data.index, 'k'] = first_group['k'].values[0]
 
+                            flash_gap = np.max(flash_gaps) if len(flash_gaps) > 0 else 0
+
+                            if len(flash_lengths) == 0:
+                                flash_length = 0
                             else:
-                                flash_lengths.append(max(kgroup_data.t) - min(kgroup_data.t))
-                                flashlengths.append(max(kgroup_data.t) - min(kgroup_data.t))
-                                xs.append(kgroup_data.x)
-                                ys.append(kgroup_data.y)
-                                zs.append(kgroup_data.z)
+                                flash_length = np.max(flash_lengths)
 
-                                flashpos.append(
-                                    (np.mean(kgroup_data.x), np.mean(kgroup_data.y), np.mean(kgroup_data.z)))
-                                first_group = kgroup_data
+                            if flash_length > ONE_FRAME_LENGTH:
+                                traj_times = np.sort(group_data.t.values)
+                                min_t, max_t = traj_times.min(), traj_times.max()
+                                time_grid = np.arange(min_t, max_t + 1 / 30, 1 / 30)
+                                closest_times = np.array([find_closest_time(traj_times, t) for t in time_grid])
+                                time_diff = np.abs(time_grid - closest_times)
+                                timeseries = (time_diff <= 1 / 30).astype(int)
+                                combined.append((flash_length,  # flash length [0]
+                                                 flash_gap,
+                                                 # flash gap [1] will never be less than 0 so this is a good sentinel
+                                                 flash_count,  # flash count [2]
+                                                 xs,  # x [3]
+                                                 ys,  # y [4]
+                                                 zs,  # z [5]
+                                                 np.mean(group_data.x),  # avx [6]
+                                                 np.mean(group_data.y),  # avy [7]
+                                                 np.mean(group_data.z),  # avz [8]
+                                                 m_displacement,  # v [9],
+                                                 t_displacement,  # sumv[10]
+                                                 list(set(ks)),  # k [11]
+                                                 group_name,  # j [12]
+                                                 timeseries,  # timeseries [13]
+                                                 str(file).split('/')[-1],  # folder_name [14]
+                                                 savename,  # date [15]
+                                                 label,  # label [16]
+                                                 species))  # species [17]
 
-                        flash_gap = np.max(flash_gaps) if len(flash_gaps) > 0 else 0
-
-                        if len(flash_lengths) == 0:
-                            flash_length = 0
-                        else:
-                            flash_length = np.max(flash_lengths)
-
-                        if flash_length > ONE_FRAME_LENGTH:
-                            traj_times = np.sort(group_data.t.values)
-                            min_t, max_t = traj_times.min(), traj_times.max()
-                            time_grid = np.arange(min_t, max_t + 1 / 30, 1 / 30)
-                            closest_times = np.array([find_closest_time(traj_times, t) for t in time_grid])
-                            time_diff = np.abs(time_grid - closest_times)
-                            timeseries = (time_diff <= 1 / 30).astype(int)
-                            combined.append((flash_length,  # flash length [0]
-                                             flash_gap,
-                                             # flash gap [1] will never be less than 0 so this is a good sentinel
-                                             flash_count,  # flash count [2]
-                                             xs,  # x [3]
-                                             ys,  # y [4]
-                                             zs,  # z [5]
-                                             np.mean(group_data.x),  # avx [6]
-                                             np.mean(group_data.y),  # avy [7]
-                                             np.mean(group_data.z),  # avz [8]
-                                             m_displacement,  # v [9],
-                                             t_displacement,  # sumv[10]
-                                             list(set(ks)),  # k [11]
-                                             group_name,  # j [12]
-                                             timeseries,  # timeseries [13]
-                                             f.split('/')[-1],  # folder_name [14]
-                                             savename,  # date [15]
-                                             label,  # label [16]
-                                             species))  # species [17]
-
-                all_dfs.append(df_cleaned)
-                all_combined.extend(combined)
+                    all_dfs.append(df_cleaned)
+                    all_combined.extend(combined)
         final_df = pd.concat(all_dfs, ignore_index=True)
         return final_df, all_combined
 

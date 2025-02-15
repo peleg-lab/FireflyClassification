@@ -6,7 +6,7 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 
 from metrics import Metrics
-from models.lightning_rnn import LITGRU
+from models.feature_lightning_rnn import LITGRU
 from modules.data_module import FireflyDataModule, RealFireflyData
 
 

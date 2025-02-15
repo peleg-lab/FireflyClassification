@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import random_split, DataLoader
 import sklearn
 
-from modules.dataset import RealFlashPatterns
+from modules.feature_dataset import RealFlashPatterns
 
 
 class FireflyDataModule(pl.LightningDataModule):

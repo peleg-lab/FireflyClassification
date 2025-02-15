@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 
-from models.lightning_rnn import LITGRU
+from models.feature_lightning_rnn import LITGRU
 from models.model_runner import ModelRunner
 
 
