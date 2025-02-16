@@ -267,7 +267,7 @@ class LITGRU(pl.LightningModule):
                                help='Path to data loaders dir, if loading from test dataloaders')
         subparser.add_argument('--data_dir', default="data", type=str,
                                help='Path to data dir')
-        subparser.add_argument('--data_file', type=str,
+        subparser.add_argument('--data_file', type=str, default='',
                                help='Data file name')
         subparser.add_argument('--top_2', default=False, type=bool,
                                help='Whether to operate in top 2 paradigm')

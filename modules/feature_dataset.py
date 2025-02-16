@@ -22,10 +22,8 @@ class RealFlashPatterns(Dataset):
 
     def _load_flash_data(self, ignore_single_flashes=True):
         # I think the data path now can be any old file containing all the combined data
-        # that means I need to save
-        dp = 'real_data/{}'.format(self._data_path)
-
-        data_path = os.path.join(self._data_root, dp)
+        # that means data dir is either a file or a dir, and if it is a dir we get everything inside at once
+        data_path = self._data_root
         if not ignore_single_flashes:
             # expects one file, so we need to make sure all the raw data are saved in one file
             # or we make it create one df from a folder path by updating the extract_from_csv logic

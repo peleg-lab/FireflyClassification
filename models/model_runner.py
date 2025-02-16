@@ -105,7 +105,7 @@ class ModelRunner:
                                           write_indices=self.hparams.write_indices,
                                           track_indices=self.hparams.track_indices)
         else:
-            data = FireflyDataModule(data_dir='data',
+            data = FireflyDataModule(data_dir=self.hparams['data_dir'],
                                      augmentations=self.augmentations,
                                      class_limit=self.hparams.n_classes,
                                      batch_size=self.hparams.batch_size,
