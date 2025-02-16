@@ -35,6 +35,7 @@ short_long_dict = {
     'ub': 'P. bethaniensis',
     'ic': 'P. carolinus',
     'ur': 'P. forresti',
+    'uf': 'P. frontalis',
     'ik': 'P. knulli',
     'io': 'P. obscurellus',
     'uw': 'P. walldoxeyi',
