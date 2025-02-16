@@ -18,7 +18,7 @@ class RealFlashPatterns(Dataset):
         self._num_species = num_species
         self.augmentations = augmentations
         self.n_classes = n_classes
-        self._load_flash_data(True)
+        self._load_flash_data(False)
 
     def _load_flash_data(self, ignore_single_flashes=True):
         # I think the data path now can be any old file containing all the combined data

@@ -257,7 +257,7 @@ class LITGRU(pl.LightningModule):
                                help='Dimension of hidden layer')
         subparser.add_argument('--dropout', default=0.0, type=float,
                                help='Dropout rate')
-        subparser.add_argument('--grad_clip', default=0.5, type=float,
+        subparser.add_argument('--grad_clip', default=0.25, type=float,
                                help='Gradient clip norm value')
         subparser.add_argument('--epochs', default=1000, type=int,
                                help='Training epochs')
@@ -283,7 +283,7 @@ class LITGRU(pl.LightningModule):
         subparser.add_argument('--load', action='store_true', help='Enable loading from saved dataloaders')
 
         # training specific (for this model)
-        subparser.add_argument('--n_classes', default=4, type=int,
+        subparser.add_argument('--n_classes', default=7, type=int,
                                help='Number of classes in the training data')
         subparser.add_argument('--gen_seed', default=42.0, type=float,
                                help='Seed for the test train split')
