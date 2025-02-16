@@ -27,7 +27,7 @@ class RealFlashPatterns(Dataset):
         if not ignore_single_flashes:
             # expects one file, so we need to make sure all the raw data are saved in one file
             # or we make it create one df from a folder path by updating the extract_from_csv logic
-            df_cleaned, combined = wrangling.extract_from_csv(data_path)
+            df_cleaned, combined = wrangling.extract_from_csv(data_path, file_flag=False)
             df_cleaned = wrangling.calculate_eccentricity(df_cleaned)
             j_to_eccentricity = df_cleaned.set_index('j')['ecc'].to_dict()
             updated_tuples = [

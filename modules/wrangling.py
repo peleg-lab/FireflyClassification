@@ -340,7 +340,7 @@ def extract_from_csv(f, file_flag=True):
         folders = [Path(f) for f in names.dataset_folders]
         for folder in folders:
             for file in folder.iterdir():
-                if '.csv' in file:
+                if '.csv' in str(file):
                     df = pd.read_csv(file, names=['x', 'y', 'z', 't', 'k', 'j'])
                     label, species = get_label_species_from_filename(str(file))
                     df_cleaned = df[df.z > -1.0]
