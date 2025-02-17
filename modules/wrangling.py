@@ -144,15 +144,12 @@ def trim_and_collate(cdf, dfc):
     cdf = pd.DataFrame(cdf, columns=headers)
 
     scaler = MinMaxScaler()
-    scaled_data = scaler.fit_transform([
-        tuple(x[h] for h in numeric_headers)
-        for x in cdf
-    ])
+    scaled_data = scaler.fit_transform(cdf[numeric_headers])
     shifted_data = scaled_data + abs(np.min(scaled_data)) + 1  # Make positive
     log_transformed_data = np.log(shifted_data)
 
     normed_data = normalize(log_transformed_data, norm='l2')
-    normed_data = pd.DataFrame(normed_data, columns=headers)
+    normed_data = pd.DataFrame(normed_data, columns=numeric_headers)
 
     # cluster logic follows:
     # this will be where we restrict / relabel aspects of the data depending on cluster membership... but only once that
@@ -199,15 +196,22 @@ def trim_and_collate(cdf, dfc):
     return feature_df, result_df
 
 
+def basic_preprocessing(df):
+    # remove points projected belowground (1 meter below camera height)
+    df_cleaned = df[df.z > -1.0]
+    # remove potentially distorted points near the x-y origin
+    df_cleaned = df_cleaned[(np.sqrt(df_cleaned.x ** 2 + df_cleaned.y ** 2) > 0.4)]
+    return df_cleaned
+
+
 def extract_from_csv(f, file_flag=True):
     if file_flag:
         if '.csv' in f:
             df = pd.read_csv(f, names=['x', 'y', 'z', 't', 'k', 'j'])
             label, species = get_label_species_from_filename(f)
-            df_cleaned = df[df.z > -1.0]
-            # remove potentially distorted points near the x-y origin
-            df_cleaned = df_cleaned[(np.sqrt(df_cleaned.x ** 2 + df_cleaned.y ** 2) > 0.4)]
+            df_cleaned = basic_preprocessing(df)
             grouped_by_traj_df = df_cleaned.groupby('j')
+
             singleflashlengths = []
             singleflashpos = []
             singlecombined = []
@@ -342,9 +346,7 @@ def extract_from_csv(f, file_flag=True):
             if '.csv' in str(file):
                 df = pd.read_csv(file, names=['x', 'y', 'z', 't', 'k', 'j'])
                 label, species = get_label_species_from_filename(str(file))
-                df_cleaned = df[df.z > -1.0]
-                # remove potentially distorted points near the x-y origin
-                df_cleaned = df_cleaned[(np.sqrt(df_cleaned.x ** 2 + df_cleaned.y ** 2) > 0.4)]
+                df_cleaned = basic_preprocessing(df)
                 grouped_by_traj_df = df_cleaned.groupby('j')
                 singleflashlengths = []
                 singleflashpos = []
@@ -477,4 +479,3 @@ def extract_from_csv(f, file_flag=True):
                 all_combined.extend(combined)
         final_df = pd.concat(all_dfs, ignore_index=True)
         return final_df, all_combined
-

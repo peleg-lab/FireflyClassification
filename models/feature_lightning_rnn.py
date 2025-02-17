@@ -31,7 +31,7 @@ class LITGRU(pl.LightningModule):
         self.embedding_dim = self.hparams['embedding_dim']
         self.embed = nn.Embedding(self.vocab_size, self.embedding_dim)
 
-        self.gru = nn.GRU(input_size=self.hparams['input_size'],
+        self.gru = nn.GRU(input_size=self.hparams['embedding_dim'],
                           hidden_size=self.hparams['hidden_size'],
                           num_layers=self.hparams['n_layers'],
                           dropout=self.hparams['dropout'],
@@ -39,7 +39,11 @@ class LITGRU(pl.LightningModule):
                           bias=True).to(self.device)
         # layers
         self.fc = nn.Linear(self.hparams['hidden_size'], self.hparams['n_classes'])
-        self.feature_fc = nn.Linear(self.hparams['input_size'], self.hparams['hidden_size'])
+        self.feature_fc = nn.Linear(self.hparams['n_features'], self.hparams['hidden_size'])
+
+        self.static_attn = nn.Linear(self.hparams['hidden_size'], 1)
+        self.gru_attn = nn.Linear(self.hparams['hidden_size'], 1)
+
         self.relu = nn.LeakyReLU(negative_slope=0.1)
         self.previous_hidden = self.init_hidden()
 
@@ -65,10 +69,18 @@ class LITGRU(pl.LightningModule):
 
     def forward(self, static_features, timeseries):
         static_embed = F.relu(self.feature_fc(static_features))
-        outs, hidden_state = self.gru(timeseries)
+        outs, hidden_state = self.gru(self.relu(timeseries))
         gru_last_out = outs[:, -1, :]
-        combined = torch.cat((static_embed, gru_last_out), dim=1)
-        outputs = self.fc_out(self.relu(combined))
+        static_score = self.static_attn(static_embed)
+        gru_score = self.gru_attn(gru_last_out)
+
+        attn_weights = F.softmax(torch.cat((static_score, gru_score), dim=1), dim=1)
+
+        weighted_static = attn_weights[:, 0:1] * static_embed
+        weighted_gru = attn_weights[:, 1:2] * gru_last_out
+        combined = weighted_static + weighted_gru
+
+        outputs = self.fc(self.relu(combined))  # (batch, num_species)
         return outputs, hidden_state
 
     def prepare_timeseries_component(self, t):
@@ -77,28 +89,37 @@ class LITGRU(pl.LightningModule):
             z = numpy.where(_t_.cpu() != 2)[0]
             seq_lens.append(len(z))
         seq_lens = torch.LongTensor(seq_lens)
-        y = y.to(self.device)
-        embed_x = self.embed(t.to(torch.int64))
+        embed_x = self.embed(torch.stack(t).to(torch.int64))
         return embed_x, seq_lens
 
-    def training_step(self, batch, batch_idx):
-        x, t, y, _ = batch
-        # prepare timeseries component
-        timeseries_, timeseries_seq_lens = self.prepare_timeseries_component(t)
+    @staticmethod
+    def get_timeseries_from_batch(x):
+        t = [tx[6:] for tx in x]
+        x = [xx[:6] for xx in x]
+        return x, t
 
-        packed = pack_padded_sequence(timeseries_, timeseries_seq_lens.cpu().numpy(), batch_first=True,
+    def training_step(self, batch, batch_idx):
+        x, y, _ = batch
+        # prepare timeseries component
+        x_features, t = self.get_timeseries_from_batch(x)
+        x_batch = torch.stack(x_features, dim=0)
+        x_timeseries, timeseries_seq_lens = self.prepare_timeseries_component(t)
+
+        packed = pack_padded_sequence(x_timeseries, timeseries_seq_lens.cpu().numpy(), batch_first=True,
                                       enforce_sorted=False)
         padded = pad_packed_sequence(packed, batch_first=True)
-        batch_output, hidden = self.forward(x.to(self.device), padded[0].to(self.device))
+        batch_output, hidden = self.forward(x_batch.to(self.device), padded[0].to(self.device))
         self.previous_hidden = hidden.detach()
 
         # compute loss
-        output_logits = batch_output.permute(1, 0, 2)
-        final_logit = output_logits[-1]
-        loss = self.criterion(final_logit, y)
+        batch_output, hidden = self.forward(x_batch.to(self.device), padded[0].to(self.device))
+
+        self.previous_hidden = hidden.detach()
+
+        loss = self.criterion(batch_output, y)
 
         # compute acc
-        softmax_vals = nn.Softmax(dim=1)(final_logit)
+        softmax_vals = nn.Softmax(dim=1)(batch_output)
         preds = softmax_vals.argmax(dim=1)
         acc = torchmetrics.functional.accuracy(preds,
                                                y,
@@ -134,25 +155,22 @@ class LITGRU(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x, y, _ = batch
-        seq_lens = []
-        for _x_ in x:
-            z = numpy.where(_x_.cpu() != 2)[0]
-            seq_lens.append(len(z))
-        seq_lens = torch.LongTensor(seq_lens)
-        y = y.to(self.device)
-        embed_x = self.embed(x.to(torch.int64))
-        packed = pack_padded_sequence(embed_x, seq_lens.cpu().numpy(), batch_first=True,
+        # prepare timeseries component
+        x_features, t = self.get_timeseries_from_batch(x)
+        x_batch = torch.stack(x_features, dim=0)
+        x_timeseries, timeseries_seq_lens = self.prepare_timeseries_component(t)
+
+        packed = pack_padded_sequence(x_timeseries, timeseries_seq_lens.cpu().numpy(), batch_first=True,
                                       enforce_sorted=False)
         padded = pad_packed_sequence(packed, batch_first=True)
-        batch_output, hidden = self.forward(padded[0].to(self.device))
+        batch_output, hidden = self.forward(x_batch.to(self.device), padded[0].to(self.device))
+
         self.previous_hidden = hidden.detach()
 
-        output_logits = batch_output.permute(1, 0, 2)
-        final_logit = output_logits[-1]
-        loss = self.criterion(final_logit, y)
+        loss = self.criterion(batch_output, y)
 
         # compute acc
-        softmax_vals = nn.Softmax(dim=1)(final_logit)
+        softmax_vals = nn.Softmax(dim=1)(batch_output)
         preds = softmax_vals.argmax(dim=1)
         acc = torchmetrics.functional.accuracy(preds, y,
                                                task='multiclass',
@@ -168,26 +186,26 @@ class LITGRU(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
         x, y, _ = batch
-        seq_lens = []
-        for _x_ in x:
-            z = numpy.where(_x_.cpu() != 2)[0]
-            seq_lens.append(len(z))
-        seq_lens = torch.LongTensor(seq_lens)
-        y = y.to(self.device)
-        embed_x = self.embed(x.to(torch.int64))
-        packed = pack_padded_sequence(embed_x, seq_lens.cpu().numpy(), batch_first=True,
+        # prepare timeseries component
+        x_features, t = self.get_timeseries_from_batch(x)
+        x_batch = torch.stack(x_features, dim=0)
+        x_timeseries, timeseries_seq_lens = self.prepare_timeseries_component(t)
+
+        packed = pack_padded_sequence(x_timeseries, timeseries_seq_lens.cpu().numpy(), batch_first=True,
                                       enforce_sorted=False)
         padded = pad_packed_sequence(packed, batch_first=True)
-        batch_output, hidden = self.forward(padded[0].to(self.device))
+        batch_output, hidden = self.forward(x_batch.to(self.device), padded[0].to(self.device))
         self.previous_hidden = hidden.detach()
 
         # compute loss
-        output_logits = batch_output.permute(1, 0, 2)
-        final_logit = output_logits[-1]
-        loss = self.criterion(final_logit, y)
+        batch_output, hidden = self.forward(x_batch.to(self.device), padded[0].to(self.device))
+
+        self.previous_hidden = hidden.detach()
+
+        loss = self.criterion(batch_output, y)
         y_pred = []
         y_true = []
-        softmax_vals = nn.Softmax(dim=1)(final_logit)
+        softmax_vals = nn.Softmax(dim=1)(batch_output)
         y_pred += list(softmax_vals.argmax(dim=1).cpu().detach().numpy())
         y_true += list(y.cpu().detach().numpy())
         cm = confusion_matrix(y_true, y_pred)
@@ -284,6 +302,8 @@ class LITGRU(pl.LightningModule):
 
         # training specific (for this model)
         subparser.add_argument('--n_classes', default=7, type=int,
+                               help='Number of classes in the training data')
+        subparser.add_argument('--n_features', default=6, type=int,
                                help='Number of classes in the training data')
         subparser.add_argument('--gen_seed', default=42.0, type=float,
                                help='Seed for the test train split')

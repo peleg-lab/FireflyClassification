@@ -22,6 +22,7 @@ class FireflyDataModule(pl.LightningDataModule):
         self.flip = flip
         self.date_to_exclude = dataset_date
         self.dataset_ratio = dataset_ratio
+        self.save = True
 
         # 1. Create full dataset
         self.full = RealFlashPatterns(data_root=self.data_dir,
@@ -35,6 +36,9 @@ class FireflyDataModule(pl.LightningDataModule):
         self.train = None
         self.val = None
         self.test = None
+        if self.save:
+            torch.save(self.full, "data/full_ff_pytorch_dataset.pth")
+
         self.setup_datasets()
 
     def setup_datasets(self):
@@ -155,14 +159,17 @@ class FireflyDataModule(pl.LightningDataModule):
                                 train_indices.extend(c_indices)
                         else:
                             k_i = int(ma / (ma - 0.8 * mi))
-                            folds = sklearn.model_selection.KFold(n_splits=k_i, shuffle=True,
-                                                                  random_state=self.gen_seed)
-                            if k_i <= len(c_indices):
-                                for j, (tr_i, t_i) in enumerate(folds.split(c_indices)):
-                                    if i % k_i == j:
-                                        train_indices.extend(c_indices[tr_i])
+                            if k_i != 0:
+                                folds = sklearn.model_selection.KFold(n_splits=k_i, shuffle=True,
+                                                                      random_state=self.gen_seed)
+                                if k_i <= len(c_indices):
+                                    for j, (tr_i, t_i) in enumerate(folds.split(c_indices)):
+                                        if i % k_i == j:
+                                            train_indices.extend(c_indices[tr_i])
+                                else:
+                                    train_indices.extend(c_indices)
                             else:
-                                train_indices.extend(c_indices)
+                                continue
 
                         v_indices = test_index[np.where(dataset[test_index][1] == c)]
                         va = len(v_indices)
