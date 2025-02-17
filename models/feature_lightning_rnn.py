@@ -111,11 +111,6 @@ class LITGRU(pl.LightningModule):
         batch_output, hidden = self.forward(x_batch.to(self.device), padded[0].to(self.device))
         self.previous_hidden = hidden.detach()
 
-        # compute loss
-        batch_output, hidden = self.forward(x_batch.to(self.device), padded[0].to(self.device))
-
-        self.previous_hidden = hidden.detach()
-
         loss = self.criterion(batch_output, y)
 
         # compute acc
@@ -195,11 +190,6 @@ class LITGRU(pl.LightningModule):
                                       enforce_sorted=False)
         padded = pad_packed_sequence(packed, batch_first=True)
         batch_output, hidden = self.forward(x_batch.to(self.device), padded[0].to(self.device))
-        self.previous_hidden = hidden.detach()
-
-        # compute loss
-        batch_output, hidden = self.forward(x_batch.to(self.device), padded[0].to(self.device))
-
         self.previous_hidden = hidden.detach()
 
         loss = self.criterion(batch_output, y)
@@ -336,21 +326,17 @@ class LITGRU(pl.LightningModule):
         with torch.no_grad():  # Deactivate gradients for the following code
             for data_inputs, data_labels, data_names in test_dataloader:
                 x, y, _ = data_inputs, data_labels, data_names
-                seq_lens = [len(numpy.where(_x_.cpu() != 2)[0]) for _x_ in x]
-                seq_lens = torch.LongTensor(seq_lens)
+                # prepare timeseries component
+                x_features, t = self.get_timeseries_from_batch(x)
+                x_batch = torch.stack(x_features, dim=0)
+                x_timeseries, timeseries_seq_lens = self.prepare_timeseries_component(t)
 
-                y = y.to(self.device)
-                embed_x = self.embed(x.to(torch.int64))
-
-                packed = pack_padded_sequence(embed_x, seq_lens.cpu().numpy(), batch_first=True,
+                packed = pack_padded_sequence(x_timeseries, timeseries_seq_lens.cpu().numpy(), batch_first=True,
                                               enforce_sorted=False)
                 padded = pad_packed_sequence(packed, batch_first=True)
-
-                batch_output, hidden = self.forward(padded[0].to(self.device))
-                output_logits = batch_output.permute(1, 0, 2)  # Shape: (seq_len, batch_size, num_classes)
-                final_logit = output_logits[-1]  # Get last time-step logits
-
-                softmax_vals = nn.Softmax(dim=1)(final_logit)
+                batch_output, hidden = self.forward(x_batch.to(self.device), padded[0].to(self.device))
+                self.previous_hidden = hidden.detach()
+                softmax_vals = nn.Softmax(dim=1)(batch_output)
                 max_probs, preds = torch.max(softmax_vals, dim=1)
 
                 # Assign "unknown" class if confidence is below threshold
@@ -369,23 +355,18 @@ class LITGRU(pl.LightningModule):
         y_true = []
         with torch.no_grad():  # Deactivate gradients for the following code
             for data_inputs, data_labels, data_names in test_dataloader:
-                # Determine prediction of model on test set
                 x, y, _ = data_inputs, data_labels, data_names
-                seq_lens = []
-                for _x_ in x:
-                    z = numpy.where(_x_.cpu() != 2)[0]
-                    seq_lens.append(len(z))
-                seq_lens = torch.LongTensor(seq_lens)
-                y = y.to(self.device)
-                embed_x = self.embed(x.to(torch.int64))
-                packed = pack_padded_sequence(embed_x, seq_lens.cpu().numpy(), batch_first=True,
+                # prepare timeseries component
+                x_features, t = self.get_timeseries_from_batch(x)
+                x_batch = torch.stack(x_features, dim=0)
+                x_timeseries, timeseries_seq_lens = self.prepare_timeseries_component(t)
+
+                packed = pack_padded_sequence(x_timeseries, timeseries_seq_lens.cpu().numpy(), batch_first=True,
                                               enforce_sorted=False)
                 padded = pad_packed_sequence(packed, batch_first=True)
-                batch_output, hidden = self.forward(padded[0].to(self.device))
-                # compute loss
-                output_logits = batch_output.permute(1, 0, 2)
-                final_logit = output_logits[-1]
-                softmax_vals = nn.Softmax(dim=1)(final_logit)
+                batch_output, hidden = self.forward(x_batch.to(self.device), padded[0].to(self.device))
+                self.previous_hidden = hidden.detach()
+                softmax_vals = nn.Softmax(dim=1)(batch_output)
                 y_pred.append(softmax_vals.cpu().detach().numpy())
                 y_true.append(list(y.cpu().detach().numpy()))
 
@@ -411,25 +392,20 @@ class LITGRU(pl.LightningModule):
                 x, y, _ = data_inputs, data_labels, data_names
                 indices = test_dataloader.dataset.indices[indexx:indexx+test_dataloader.batch_size]
                 indexx += test_dataloader.batch_size
-                seq_lens = []
+                # prepare timeseries component
+                x_features, t = self.get_timeseries_from_batch(x)
+                x_batch = torch.stack(x_features, dim=0)
+                x_timeseries, timeseries_seq_lens = self.prepare_timeseries_component(t)
 
-                for _x_ in x:
-                    z = numpy.where(_x_.cpu() != 2)[0]
-                    seq_lens.append(len(z))
-                seq_lens = torch.LongTensor(seq_lens)
-                y = y.to(self.device)
-                embed_x = self.embed(x.to(torch.int64))
-                packed = pack_padded_sequence(embed_x, seq_lens.cpu().numpy(), batch_first=True,
+                packed = pack_padded_sequence(x_timeseries, timeseries_seq_lens.cpu().numpy(), batch_first=True,
                                               enforce_sorted=False)
                 padded = pad_packed_sequence(packed, batch_first=True)
-                batch_output, hidden = self.forward(padded[0].to(self.device))
-
+                batch_output, hidden = self.forward(x_batch.to(self.device), padded[0].to(self.device))
+                self.previous_hidden = hidden.detach()
                 if plot_clusters:
                     self.tsne_cluster(hidden, y, ax)
 
-                output_logits = batch_output.permute(1, 0, 2)
-                final_logit = output_logits[-1]
-                softmax_vals = nn.Softmax(dim=1)(final_logit)
+                softmax_vals = nn.Softmax(dim=1)(batch_output)
                 for i, j in enumerate(softmax_vals):
                     max_prob = j.max().item()
                     tru = y[i].item()
