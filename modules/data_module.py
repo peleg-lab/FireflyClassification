@@ -22,7 +22,7 @@ class FireflyDataModule(pl.LightningDataModule):
         self.flip = flip
         self.date_to_exclude = dataset_date
         self.dataset_ratio = dataset_ratio
-        self.save = True
+        self.save = False
 
         # 1. Create full dataset
         self.full = RealFlashPatterns(data_root=self.data_dir,
@@ -81,6 +81,10 @@ class FireflyDataModule(pl.LightningDataModule):
 
     def train_test_val_split(self, dataset, bs, downsample):
         excluded_dataset, included_dataset = self.split_dataset_by_date(dataset._meta_data)
+        mask = np.array([isinstance(val, (int, float, np.int64, np.float64))
+                         for val in dataset._meta_data.species_label.values])
+        dataset._data = dataset._data[mask]
+        dataset._meta_data = dataset._meta_data[mask]
         val_split = self.val_split if self.val_split is not None else 0
         dataset_size = len(dataset)
         if excluded_dataset is None:
@@ -137,9 +141,10 @@ class FireflyDataModule(pl.LightningDataModule):
         strat_cv = sklearn.model_selection.StratifiedKFold(n_splits=k, shuffle=True, random_state=self.gen_seed)
         train_indices = []
         valid_indices = []
+
         if excluded_dataset is None:
             for i, (train_index, test_index) in enumerate(
-                    strat_cv.split(dataset, dataset._meta_data.species_label.values)):
+                    strat_cv.split(dataset, dataset._meta_data.species_label.values.astype(int))):
                 if i != self.gen_seed % k:
                     continue
                 else:
@@ -195,8 +200,8 @@ class FireflyDataModule(pl.LightningDataModule):
                                         valid_indices.extend(v_indices[tv_i])
                             else:
                                 valid_indices.extend(v_indices)
-                        # end cv
-                        # make subset objects
+            # end cv
+            # make subset objects
             train_dataset, valid_dataset, test_dataset = random_split(
                 dataset=dataset, lengths=[n_train, n_val, n_test],
                 generator=torch.Generator().manual_seed(self.gen_seed)

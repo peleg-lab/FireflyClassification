@@ -70,17 +70,18 @@ class LITGRU(pl.LightningModule):
     def forward(self, static_features, timeseries):
         static_embed = F.relu(self.feature_fc(static_features))
         outs, hidden_state = self.gru(self.relu(timeseries))
+
         gru_last_out = outs[:, -1, :]
+
         static_score = self.static_attn(static_embed)
         gru_score = self.gru_attn(gru_last_out)
 
         attn_weights = F.softmax(torch.cat((static_score, gru_score), dim=1), dim=1)
-
         weighted_static = attn_weights[:, 0:1] * static_embed
         weighted_gru = attn_weights[:, 1:2] * gru_last_out
         combined = weighted_static + weighted_gru
 
-        outputs = self.fc(self.relu(combined))  # (batch, num_species)
+        outputs = self.fc(self.relu(combined))
         return outputs, hidden_state
 
     def prepare_timeseries_component(self, t):
@@ -101,7 +102,7 @@ class LITGRU(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y, _ = batch
         # prepare timeseries component
-        x_features, t = self.get_timeseries_from_batch(x)
+        x_features, t = self.get_timeseries_from_batch(x.to(self.device))
         x_batch = torch.stack(x_features, dim=0)
         x_timeseries, timeseries_seq_lens = self.prepare_timeseries_component(t)
 
@@ -151,7 +152,7 @@ class LITGRU(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         x, y, _ = batch
         # prepare timeseries component
-        x_features, t = self.get_timeseries_from_batch(x)
+        x_features, t = self.get_timeseries_from_batch(x.to(self.device))
         x_batch = torch.stack(x_features, dim=0)
         x_timeseries, timeseries_seq_lens = self.prepare_timeseries_component(t)
 
@@ -182,7 +183,7 @@ class LITGRU(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         x, y, _ = batch
         # prepare timeseries component
-        x_features, t = self.get_timeseries_from_batch(x)
+        x_features, t = self.get_timeseries_from_batch(x.to(self.device))
         x_batch = torch.stack(x_features, dim=0)
         x_timeseries, timeseries_seq_lens = self.prepare_timeseries_component(t)
 
@@ -327,7 +328,7 @@ class LITGRU(pl.LightningModule):
             for data_inputs, data_labels, data_names in test_dataloader:
                 x, y, _ = data_inputs, data_labels, data_names
                 # prepare timeseries component
-                x_features, t = self.get_timeseries_from_batch(x)
+                x_features, t = self.get_timeseries_from_batch(x.to(self.device))
                 x_batch = torch.stack(x_features, dim=0)
                 x_timeseries, timeseries_seq_lens = self.prepare_timeseries_component(t)
 
@@ -357,7 +358,7 @@ class LITGRU(pl.LightningModule):
             for data_inputs, data_labels, data_names in test_dataloader:
                 x, y, _ = data_inputs, data_labels, data_names
                 # prepare timeseries component
-                x_features, t = self.get_timeseries_from_batch(x)
+                x_features, t = self.get_timeseries_from_batch(x.to(self.device))
                 x_batch = torch.stack(x_features, dim=0)
                 x_timeseries, timeseries_seq_lens = self.prepare_timeseries_component(t)
 
