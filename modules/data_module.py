@@ -137,6 +137,7 @@ class FireflyDataModule(pl.LightningDataModule):
         return train_dataset, valid_dataset, test_dataset
 
     def cv(self, excluded_dataset, included_dataset, dataset, n_train, n_val, n_test, downsample, k):
+        print('starting {}_fold CV'.format(k))
         # CVl
         strat_cv = sklearn.model_selection.StratifiedKFold(n_splits=k, shuffle=True, random_state=self.gen_seed)
         train_indices = []

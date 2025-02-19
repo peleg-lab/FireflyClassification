@@ -8,7 +8,6 @@ name_dict = {
     'P. knulli',
     'P. obscurellus',
     'Photuris sp. FR',
-    'Pyractomena sp. FR',
     'P. walldoxeyi',
     'Unknown'
     ]
@@ -23,10 +22,9 @@ name_label_dict = {
     'P. knulli': 5,
     'P. obscurellus': 6,
     'Photuris sp. FR': 7,
-    'Pyractomena sp. FR': 8,
-    'P. greeni': 9,
-    'P. walldoxeyi': 10,
-    'Unknown': 11,
+    'P. greeni': 8,
+    'P. walldoxeyi': 9,
+    'Unknown': 10,
 }
 
 short_long_dict = {
@@ -41,7 +39,6 @@ short_long_dict = {
     'us': 'Photuris sp. FR',
     'ig': 'P. greeni',
     'ug': 'P. greeni',
-    'ys': 'Pyractomena sp. FR',
     'xx': 'Unknown',
     'mx': 'Unknown',
 }
