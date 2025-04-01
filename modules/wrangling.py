@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import os
 
-from sklearn.preprocessing import StandardScaler, RobustScaler, MinMaxScaler, normalize
+from sklearn.preprocessing import MinMaxScaler, normalize
 
 
 ONE_FRAME_LENGTH = 0.0333
@@ -35,6 +35,81 @@ def calculate_eccentricity(df):
     eccentricity_df = pd.DataFrame(results)
 
     df['ecc'] = df['j'].map(eccentricity_df.set_index('group')['eccentricity'])
+
+    return df
+
+
+def compute_curvature(df):
+    results = []
+
+    for group, data in df.groupby('traj'):
+        points = data[['x', 'y', 'z']].to_numpy()
+
+        mean = np.mean(points, axis=0)
+        centered_points = points - mean
+
+        if len(centered_points) > 2:  # Need at least 3 points for curvature
+            cov_matrix = np.cov(centered_points.T)
+            eigenvalues, eigenvectors = np.linalg.eig(cov_matrix)
+            eigenvalues = np.sort(eigenvalues)[::-1]
+
+            # Find the normal vector (corresponds to smallest eigenvalue)
+            normal_vector = eigenvectors[:, np.argmin(eigenvalues)]
+
+            # Project points onto best-fitting plane (removing normal component)
+            projected_points = centered_points - (centered_points @ normal_vector[:, None]) * normal_vector
+
+            # Compute distances of projected points from centroid
+            distances = np.linalg.norm(projected_points, axis=1)
+            radius = np.mean(distances) if np.mean(distances) > 0 else np.inf  # Avoid division by zero
+
+            # Curvature is the inverse of the estimated radius
+            curvature = 1 / radius if radius != np.inf else 0
+        else:
+            curvature = 0  # Not enough points to define curvature
+
+        results.append({'group': group, 'curvature': curvature})
+
+    curvature_df = pd.DataFrame(results)
+    df['curvature'] = df['traj'].map(curvature_df.set_index('group')['curvature'])
+
+    return df
+
+
+
+def compute_curvature(df):
+    results = []
+
+    for group, data in df.groupby('j'):
+        points = data[['x', 'y', 'z']].to_numpy()
+
+        mean = np.mean(points, axis=0)
+        centered_points = points - mean
+
+        if len(centered_points) > 2:  # Need at least 3 points for curvature
+            cov_matrix = np.cov(centered_points.T)
+            eigenvalues, eigenvectors = np.linalg.eig(cov_matrix)
+            eigenvalues = np.sort(eigenvalues)[::-1]
+
+            # Find the normal vector (corresponds to smallest eigenvalue)
+            normal_vector = eigenvectors[:, np.argmin(eigenvalues)]
+
+            # Project points onto best-fitting plane (removing normal component)
+            projected_points = centered_points - (centered_points @ normal_vector[:, None]) * normal_vector
+
+            # Compute distances of projected points from centroid
+            distances = np.linalg.norm(projected_points, axis=1)
+            radius = np.mean(distances) if np.mean(distances) > 0 else np.inf  # Avoid division by zero
+
+            # Curvature is the inverse of the estimated radius
+            curvature = 1 / radius if radius != np.inf else 0
+        else:
+            curvature = 0  # Not enough points to define curvature
+
+        results.append({'group': group, 'curvature': curvature})
+
+    curvature_df = pd.DataFrame(results)
+    df['curvature'] = df['j'].map(curvature_df.set_index('group')['curvature'])
 
     return df
 
@@ -115,7 +190,7 @@ def get_label_species_from_filename(f):
     elif 'uw' in f:
         return names.name_label_dict[names.short_long_dict['uw']], names.short_long_dict['uw']
     else:
-        return 'Not in dataset yet! ', 'None'
+        return 'N/A', 'None'
 
 
 def calc_displacements(x, y, z):

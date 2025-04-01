@@ -8,6 +8,7 @@ name_dict = {
     'P. knulli',
     'P. obscurellus',
     'Photuris sp. FR',
+    'P. greeni',
     'P. walldoxeyi',
     'Unknown'
     ]

@@ -29,11 +29,14 @@ class RealFlashPatterns(Dataset):
             # or we make it create one df from a folder path by updating the extract_from_csv logic
             df_cleaned, combined = wrangling.extract_from_csv(data_path, file_flag=False)
             df_cleaned = wrangling.calculate_eccentricity(df_cleaned)
+            #df_cleaned = wrangling.compute_curvature(df_cleaned)
             j_to_eccentricity = df_cleaned.set_index('j')['ecc'].to_dict()
+
             updated_tuples = [
                 tup + (j_to_eccentricity.get(tup[wrangling.r_map['traj']], None),)
                 for tup in combined
             ]
+
             combined = updated_tuples
 
             combined_df, df_cleaned = wrangling.trim_and_collate(combined, df_cleaned)
