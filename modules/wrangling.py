@@ -76,7 +76,6 @@ def compute_curvature(df):
     return df
 
 
-
 def compute_curvature(df):
     results = []
 
