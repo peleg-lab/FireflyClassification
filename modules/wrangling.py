@@ -1,5 +1,7 @@
 import math
-from data.names import names
+import sys
+sys.path.append("data/names")
+import names
 import numpy as np
 import pandas as pd
 import os
@@ -553,3 +555,4 @@ def extract_from_csv(f, file_flag=True):
                 all_combined.extend(combined)
         final_df = pd.concat(all_dfs, ignore_index=True)
         return final_df, all_combined
+

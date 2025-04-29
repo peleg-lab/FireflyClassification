@@ -18,7 +18,9 @@ import torchmetrics
 
 from sklearn.metrics import confusion_matrix, f1_score
 
-from data.names import names
+import sys
+sys.path.append("data/names")
+import names
 
 from torch.nn.utils.rnn import pad_packed_sequence,pack_padded_sequence
 
@@ -116,10 +118,9 @@ class LITGRU(pl.LightningModule):
 
         # compute acc
         softmax_vals = nn.Softmax(dim=1)(batch_output)
-        preds = softmax_vals.argmax(dim=1)
-        acc = torchmetrics.functional.accuracy(preds,
+        #preds = softmax_vals.argmax(dim=1)
+        acc = torchmetrics.functional.accuracy(softmax_vals,
                                                y,
-                                               task='multiclass',
                                                num_classes=self.hparams['n_classes'],
                                                top_k=1)
 
@@ -167,9 +168,8 @@ class LITGRU(pl.LightningModule):
 
         # compute acc
         softmax_vals = nn.Softmax(dim=1)(batch_output)
-        preds = softmax_vals.argmax(dim=1)
-        acc = torchmetrics.functional.accuracy(preds, y,
-                                               task='multiclass',
+        #preds = softmax_vals.argmax(dim=1)
+        acc = torchmetrics.functional.accuracy(softmax_vals, y,
                                                num_classes=self.hparams['n_classes'],
                                                top_k=1)
         self.log_dict(
@@ -524,3 +524,5 @@ class LITGRU(pl.LightningModule):
             mask = (df['y'] == s)
 
             ax.scatter(df['tsne-one'][mask], df['tsne-two'][mask], color=colors[s])
+
+
