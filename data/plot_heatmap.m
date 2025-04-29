@@ -6,7 +6,7 @@ carolinus = seqs(labels==2,:);
 pyralis = seqs(labels==3,:);
 bw = seqs(labels==4,:);
 %%
-figure()
+figlsure()
 pyralis_heatmap = nansum(pyralis)./size(pyralis,1);
 bw_heatmap = nansum(bw)./size(bw,1);
 knulli_heatmap = nansum(knulli)./size(knulli,1);

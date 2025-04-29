@@ -1,5 +1,7 @@
 import math
-from data.names import names
+import sys
+sys.path.append("data/names")
+import names
 import numpy as np
 import pandas as pd
 import os
