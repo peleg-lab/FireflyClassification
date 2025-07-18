@@ -17,8 +17,10 @@ import torch.optim as optim
 import torchmetrics
 
 from sklearn.metrics import confusion_matrix, f1_score
+import sys
+sys.path.append("data/names")
+import names
 
-from data.names import names
 
 from torch.nn.utils.rnn import pad_packed_sequence,pack_padded_sequence
 

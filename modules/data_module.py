@@ -4,9 +4,10 @@ import pytorch_lightning as pl
 import torch
 from torch.utils.data import random_split, DataLoader
 import sklearn
-
+import matplotlib.pyplot as plt
+import torch.utils.data
 from modules.dataset import RealFlashPatterns
-
+import os
 
 class FireflyDataModule(pl.LightningDataModule):
     def __init__(self, data_dir, augmentations, class_limit, batch_size, val_split, gen_seed, downsample, data_path,
@@ -76,47 +77,78 @@ class FireflyDataModule(pl.LightningDataModule):
         return DataLoader(self.test, batch_size=self.batch_size, drop_last=True, shuffle=False)
 
     def train_test_val_split(self, dataset, bs, downsample):
+        def get_counts(ds):
+            if isinstance(ds, torch.utils.data.Subset):
+                meta = ds.dataset._meta_data
+                idxs = ds.indices
+                return meta.iloc[idxs]['species_label'].value_counts()
+            elif isinstance(ds, pd.DataFrame):
+                return ds['species_label'].value_counts()
+            elif hasattr(ds, '_meta_data'):
+                return ds._meta_data['species_label'].value_counts()
+            else:
+                raise ValueError(f"Cannot extract species counts from {type(ds)}")
+
+        # Ensure figs directory exists
+        os.makedirs('figs', exist_ok=True)
+
+        # 1) Full dataset distribution
+        print("✅ Full dataset species distribution:")
+        print(get_counts(dataset))
+
         excluded_dataset, included_dataset = self.split_dataset_by_date(dataset._meta_data)
-        val_split = self.val_split if self.val_split is not None else 0
+        val_split = self.val_split or 0
         dataset_size = len(dataset)
+
+        # 2) Compute split sizes...
         if excluded_dataset is None:
             if val_split > 0:
-
-                print('splitting into test/train/val sets... (split % = {})'.format(val_split * 100))
-                n_train = int(dataset_size * (1 - (2 * val_split)))
+                print(f"🔀 Splitting → train/val/test (val = {val_split * 100:.1f}%)")
+                n_train = int(dataset_size * (1 - 2 * val_split))
                 n_val = int(dataset_size * val_split)
-                n_test = int(dataset_size * val_split)
-
-                diff = dataset_size - (n_train + n_val + n_test)
-
-                try:
-                    assert diff == 0
-                except AssertionError:
-                    while diff > 0:
-                        n_train += 1
-                        diff = dataset_size - (n_train + n_val + n_test)
+                n_test = n_val
+                while n_train + n_val + n_test < dataset_size:
+                    n_train += 1
             else:
-                n_train = 0
-                n_val = 0
-                n_test = len(dataset)
-                if self.gen_seed is None:
-                    self.gen_seed = 42
+                print("ℹ️  No validation split; all goes to test")
+                n_train = 0;
+                n_val = 0;
+                n_test = dataset_size
+                self.gen_seed = self.gen_seed or 42
         else:
-            print('Keeping {} in the test set, splitting rest of data into train and validation sets'.format(
-                self.date_to_exclude))
+            print(f"🔀 Excluding up through {self.date_to_exclude} → test; rest → train/val")
+            n_test = len(excluded_dataset)
             n_train = int(len(included_dataset) * (1 - val_split))
             n_val = int(len(included_dataset) * val_split)
-            n_test = int(len(excluded_dataset))
-            diff = dataset_size - (n_train + n_val + n_test)
+            while n_train + n_val + n_test < dataset_size:
+                n_train += 1
 
-            try:
-                assert diff == 0
-            except AssertionError:
-                while diff > 0:
-                    n_train += 1
-                    diff = dataset_size - (n_train + n_val + n_test)
+        # 3) Candidate train distribution BEFORE downsampling
+        pre_counts = get_counts(included_dataset).sort_index()
+        print("✅ Candidate train set distribution BEFORE downsampling:")
+        print(pre_counts)
 
-        train_dataset, valid_dataset, test_dataset = self.cv(
+        # Plot & save histogram BEFORE downsampling
+        fig_pre, ax_pre = plt.subplots()
+        bars_pre = ax_pre.bar(pre_counts.index, pre_counts.values)
+        ax_pre.set_title('Species Count BEFORE Downsampling')
+        ax_pre.set_xlabel('Species Label')
+        ax_pre.set_ylabel('Count')
+        for bar in bars_pre:
+            h = int(bar.get_height())
+            ax_pre.annotate(f'{h}',
+                            xy=(bar.get_x() + bar.get_width() / 2, h),
+                            xytext=(0, 3),
+                            textcoords='offset points',
+                            ha='center', va='bottom', fontsize=8)
+        plt.tight_layout()
+        pre_path = os.path.join('figs', 'species_count_before_downsampling.png')
+        fig_pre.savefig(pre_path)
+        print(f"✅ Pre-downsampling histogram saved to {pre_path}")
+        plt.close(fig_pre)
+
+        # 4) Actual split & downsample via cv()
+        train_ds, val_ds, test_ds = self.cv(
             excluded_dataset,
             included_dataset,
             dataset,
@@ -124,9 +156,35 @@ class FireflyDataModule(pl.LightningDataModule):
             downsample,
             k=120
         )
+
+        # 5) Train distribution AFTER downsampling
+        post_counts = get_counts(train_ds).sort_index()
+        print("✅ Train set distribution AFTER downsampling:")
+        print(post_counts)
+
+        # Plot & save histogram AFTER downsampling
+        fig_post, ax_post = plt.subplots()
+        bars_post = ax_post.bar(post_counts.index, post_counts.values)
+        ax_post.set_title('Species Count AFTER Downsampling')
+        ax_post.set_xlabel('Species Label')
+        ax_post.set_ylabel('Count')
+        for bar in bars_post:
+            h = int(bar.get_height())
+            ax_post.annotate(f'{h}',
+                             xy=(bar.get_x() + bar.get_width() / 2, h),
+                             xytext=(0, 3),
+                             textcoords='offset points',
+                             ha='center', va='bottom', fontsize=8)
+        plt.tight_layout()
+        post_path = os.path.join('figs', 'species_count_after_downsampling.png')
+        fig_post.savefig(post_path)
+        print(f"✅ Post-downsampling histogram saved to {post_path}")
+        plt.close(fig_post)
+
+        # 6) Return in correct order
         if self.flip:
-            return test_dataset, valid_dataset, train_dataset
-        return train_dataset, valid_dataset, test_dataset
+            return test_ds, val_ds, train_ds
+        return train_ds, val_ds, test_ds
 
     def cv(self, excluded_dataset, included_dataset, dataset, n_train, n_val, n_test, downsample, k):
         # CVl

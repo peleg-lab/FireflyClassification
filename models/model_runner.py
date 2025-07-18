@@ -129,7 +129,8 @@ class ModelRunner:
                               log_every_n_steps=25,
                               fast_dev_run=self.hparams.test,
                               logger=logger,
-                              gpus=self.hparams.gpus,
+                              #gpus=self.hparams.gpus,
+                              accelerator='gpu' if self.hparams.gpus and self.hparams.gpus > 0 else 'cpu',
                               callbacks=[EarlyStopping(monitor="train_loss", mode="min", patience=50)]
                               )
             trainer.fit(model, data)
