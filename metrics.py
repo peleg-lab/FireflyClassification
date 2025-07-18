@@ -8,9 +8,7 @@ from collections import Counter
 
 import matplotlib.pyplot as plt
 
-import sys
-sys.path.append("data/names")
-import names
+from data.names import names
 
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.metrics import auc, \
